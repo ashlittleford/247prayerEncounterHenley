@@ -19,9 +19,11 @@ def load_and_combine_csvs(file_paths):
             df = pd.read_csv(path)
             # Handle different date formats based on file
             if "initial.csv" in path:
+                # Specific format for initial.csv (DD/MM/YYYY HH:MM)
                 df["start_time"] = pd.to_datetime(df["start_time"], format="%d/%m/%Y %H:%M", errors="coerce")
                 df["end_time"] = pd.to_datetime(df["end_time"], format="%d/%m/%Y %H:%M", errors="coerce")
             else:
+                # Default inference for current.csv (YYYY-MM-DD HH:MM:SS)
                 df["start_time"] = pd.to_datetime(df["start_time"], errors="coerce")
                 df["end_time"] = pd.to_datetime(df["end_time"], errors="coerce")
             dfs.append(df)
@@ -153,9 +155,8 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     return metrics
 
 def export_user_summary_to_csv(df, outdir):
-    """Exports a summary of users with their weekly and fortnightly average hours,
-    calculated by dividing their total hours by the number of weeks/fortnights
-    in the total data period."""
+    """Exports a summary of users with their personal details and weekly/fortnightly average hours.
+    (Keeps: firstname, lastname, mobile, email columns)."""
     
     start_date = df["start_time"].min().date()
     today = pd.Timestamp.now().normalize().date()
@@ -163,15 +164,20 @@ def export_user_summary_to_csv(df, outdir):
     total_weeks = total_days / 7
     total_fortnights = total_days / 14
     
-    # Get the most common person_name for each person_key
-    most_common_names = df.groupby('person_key')['person_name'].apply(lambda x: x.mode()[0] if not x.mode().empty else 'UNKNOWN').reset_index(name='person_name')
-    
-    user_summary = df.groupby("person_key").agg(
+    # 1. Aggregate user details and total hours (using 'first' to grab one representative detail)
+    user_agg = df.groupby("person_key").agg(
+        firstname=("firstname", "first"),
+        lastname=("lastname", "first"),
+        email=("email", "first"),
+        mobile=("mobile", "first"),
         total_hours=("duration", "sum"),
     ).reset_index()
 
-    # Merge the most common names back into the summary
-    user_summary = user_summary.merge(most_common_names, on='person_key', how='left')
+    # 2. Get the most common person_name (for display name stability)
+    most_common_names = df.groupby('person_key')['person_name'].apply(lambda x: x.mode()[0] if not x.mode().empty else 'UNKNOWN').reset_index(name='person_name')
+
+    # 3. Merge display name and calculate averages
+    user_summary = user_agg.merge(most_common_names, on='person_key', how='left')
 
     user_summary["weekly_avg_hours"] = user_summary["total_hours"] / total_weeks if total_weeks > 0 else 0
     user_summary["fortnightly_avg_hours"] = user_summary["total_hours"] / total_fortnights if total_fortnights > 0 else 0
@@ -179,7 +185,12 @@ def export_user_summary_to_csv(df, outdir):
     # Format to 2 decimal places before saving
     user_summary[["weekly_avg_hours", "fortnightly_avg_hours"]] = user_summary[["weekly_avg_hours", "fortnightly_avg_hours"]].round(2)
     
-    user_summary[["person_key", "person_name", "weekly_avg_hours", "fortnightly_avg_hours"]].to_csv(os.path.join(outdir, "user.csv"), index=False)
+    # Export with new columns
+    user_summary[[
+        "firstname", "lastname", "mobile", "email", 
+        "person_key", "person_name", 
+        "weekly_avg_hours", "fortnightly_avg_hours"
+    ]].to_csv(os.path.join(outdir, "user.csv"), index=False)
     
     return user_summary
 
@@ -206,12 +217,100 @@ def calculate_regulars_metrics(df, user_summary, outdir):
     return metrics
 
 def export_top_10_slots(df, outdir):
-    """Exports the top 10 most booked prayer slots to a CSV file."""
+    """Exports the top 10 most booked prayer slots based on total raw bookings/entries."""
+    
     df["weekday"] = df["start_time"].dt.day_name()
     df["hour"] = df["start_time"].dt.hour
     
-    top_10 = df.groupby(["weekday", "hour"]).size().reset_index(name="bookings").sort_values("bookings", ascending=False).head(10)
-    top_10.to_csv(os.path.join(outdir, "top_10_slots.csv"), index=False)
+    # 1. Count the total number of bookings for each slot (using the full dataframe)
+    top_slots_count = df.groupby(["weekday", "hour"]).size().reset_index(name="total_bookings")
+    
+    # 2. Sort by count and take top 10
+    top_10 = top_slots_count.sort_values("total_bookings", ascending=False).head(10)
+
+    # 3. Save the result
+    top_10[["weekday", "hour", "total_bookings"]].to_csv(os.path.join(outdir, "top_10_slots.csv"), index=False)
+
+def export_weekly_likelihood_metrics(df, outdir):
+    """
+    Calculates and exports the top 3 slots for two likelihood metrics, one being a probability distribution
+    over all 168 slots (7 days * 24 hours).
+    """
+    
+    # Calculate Total Weeks in the dataset (Denominator for Metric 1)
+    start_date = df["start_time"].min().normalize()
+    end_date = df["start_time"].max().normalize()
+    total_weeks = max(1.0, (end_date - start_date).days / 7)
+    
+    df["weekday"] = df["start_time"].dt.day_name()
+    df["hour"] = df["start_time"].dt.hour
+    
+    # -----------------------------------------------
+    # Metric 1: Top 3 slots Avg Bookings per Week (Volume)
+    # -----------------------------------------------
+    
+    # 1. Count total bookings per slot (Weekday + Hour)
+    total_bookings_per_slot = df.groupby(["weekday", "hour"]).size().reset_index(name="total_bookings")
+    
+    # 2. Calculate average weekly bookings
+    total_bookings_per_slot["weekly_avg_bookings"] = total_bookings_per_slot["total_bookings"] / total_weeks
+    
+    # 3. Rank and take top 3
+    top_3_total = total_bookings_per_slot.sort_values("weekly_avg_bookings", ascending=False).head(3)
+    
+    top_3_total = top_3_total.rename(columns={"weekly_avg_bookings": "Likelihood Value"})
+    top_3_total["Metric"] = "Top 3 - Avg Bookings per Week (Volume)"
+    top_3_total = top_3_total[["Metric", "weekday", "hour", "Likelihood Value"]]
+
+
+    # -----------------------------------------------
+    # Metric 2: Slot Selection Probability (Unique User Choice) - All 168 slots sum to 1
+    # -----------------------------------------------
+    
+    # 1. Filter: Get unique user selection for a slot (Person + Weekday + Hour)
+    df_unique_choice = df.drop_duplicates(subset=["person_key", "weekday", "hour"])
+
+    # 2. Denominator: Total number of unique slot choices made across the entire dataset (sum of unique entries)
+    total_unique_choices = len(df_unique_choice)
+
+    # 3. Numerator: Count how many unique users chose each slot
+    slot_count = df_unique_choice.groupby(["weekday", "hour"]).size().reset_index(name="unique_user_count")
+
+    # 4. Create all 168 possible slots (to ensure 0s are included)
+    all_weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    all_hours = range(24)
+    all_slots = pd.MultiIndex.from_product([all_weekdays, all_hours], names=['weekday', 'hour']).to_frame(index=False)
+
+    # 5. Merge, fill 0s, and calculate probability
+    slot_probability = all_slots.merge(slot_count, on=['weekday', 'hour'], how='left').fillna(0)
+    slot_probability["unique_user_count"] = slot_probability["unique_user_count"].astype(int)
+    slot_probability["Probability"] = slot_probability["unique_user_count"] / total_unique_choices
+    
+    # Export the full 168-slot probability table
+    full_probability_df = slot_probability[["weekday", "hour", "Probability"]].sort_values(by=["Probability", "weekday", "hour"], ascending=[False, True, True])
+    full_probability_df.to_csv(os.path.join(outdir, "unique_user_slot_probability.csv"), index=False)
+
+    # Extract Top 3 from the full probability table for the comparison CSV
+    top_3_probability = slot_probability.sort_values("Probability", ascending=False).head(3)
+    
+    top_3_probability = top_3_probability.rename(columns={"Probability": "Likelihood Value"})
+    top_3_probability["Metric"] = "Top 3 - Slot Selection Probability (Unique User)"
+    top_3_probability = top_3_probability[["Metric", "weekday", "hour", "Likelihood Value"]]
+    
+    
+    # -----------------------------------------------
+    # Combine Top 3s and Export (for comparison)
+    # -----------------------------------------------
+    
+    combined_top_slots = pd.concat([top_3_total, top_3_probability], ignore_index=True)
+    
+    # Format value column to 4 decimal places for probability
+    combined_top_slots["Likelihood Value"] = combined_top_slots["Likelihood Value"].round(4)
+        
+    combined_top_slots.to_csv(os.path.join(outdir, "weekly_slot_likelihood.csv"), index=False)
+    
+    return combined_top_slots
+
 
 def plot_hourly_distribution(df, outdir):
     """Plots the hourly distribution of total prayer hours."""
@@ -350,10 +449,13 @@ def run_analysis(input_files, outdir):
     metrics_df.to_csv(os.path.join(outdir, "dashboard_summary.csv"), index=False)
     
     print("Dashboard summary has been saved to dashboard_summary.csv.")
-    print("User summary with weekly and fortnightly averages has been saved to user.csv.")
-    print("Top 10 most booked slots have been exported to top_10_slots.csv.")
+    print("User summary with first name, last name, mobile, and email has been saved to user.csv.")
+    print("Top 10 most booked slots (by total raw bookings) have been exported to top_10_slots.csv.")
+    print("Weekly slot likelihood metrics (Top 3 Volume and Top 3 Probability) have been exported to weekly_slot_likelihood.csv.")
+    print("The full 168-slot probability table has been exported to unique_user_slot_probability.csv, where all probabilities sum to 1.")
 
     export_top_10_slots(df, outdir)
+    export_weekly_likelihood_metrics(df, outdir)
     plot_hourly_distribution(df, outdir)
     plot_binary_hourly_distribution(df, outdir)
     plot_weekly_total_hours(df, outdir)

@@ -1,4 +1,4 @@
-weekday,hour,bookings
+weekday,hour,total_bookings
 Monday,6,15
 Tuesday,19,14
 Tuesday,17,9
