@@ -118,7 +118,7 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     # --- RECENTLY ---
     today_ts = pd.Timestamp.now().normalize()
     
-    # 7-Day Periods (No Change)
+    # 7-Day Periods
     last_7_days_start = today_ts - timedelta(days=7)
     prev_7_days_start = today_ts - timedelta(days=14)
     
@@ -134,7 +134,7 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     pct_last_7 = (hours_last_7 / total_possible_hours_7) * 100 if total_possible_hours_7 > 0 else 0
     pct_prev_7 = (hours_prev_7 / total_possible_hours_7) * 100 if total_possible_hours_7 > 0 else 0
 
-    # Monthly Periods: Now changed to 28-Day Periods (4 Weeks)
+    # 28-Day Periods (4 Weeks)
     last_28_days_start = today_ts - timedelta(days=28)
     prev_28_days_start = today_ts - timedelta(days=56)
     
@@ -362,8 +362,8 @@ def plot_binary_hourly_distribution(df, outdir):
     plt.savefig(os.path.join(outdir, "hourly_users.png"))
     plt.close()
 
-def plot_weekly_total_hours(df, outdir):
-    """Creates a line graph of the weekly total hours."""
+def plot_weekly_total_hours(df, outdir, goal_percentage):
+    """Creates a line graph of the weekly total hours with a dynamic goal line (or no line if goal_percentage is None)."""
     df_weekly_total = df.groupby(pd.Grouper(key="start_time", freq="W"))["duration"].sum().reset_index()
     
     plt.figure(figsize=(10, 5))
@@ -374,6 +374,15 @@ def plot_weekly_total_hours(df, outdir):
     plt.grid(True)
     
     ax = plt.gca()
+
+    # --- Conditional Goal Line Logic ---
+    if goal_percentage is not None and isinstance(goal_percentage, (int, float)):
+        # Calculate goal line: 7 days * 24 hours = 168 total hours
+        weekly_goal_hours = (7 * 24) * (goal_percentage / 100)
+        # Add a red dashed horizontal line at the goal percentage mark
+        ax.axhline(y=weekly_goal_hours, color='red', linestyle='--', label=f'{goal_percentage}% Goal ({weekly_goal_hours:.1f} hrs)')
+        ax.legend()
+    
     # Set the x-axis to show a label for every second week to improve readability
     ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d, %Y'))
@@ -383,8 +392,8 @@ def plot_weekly_total_hours(df, outdir):
     plt.savefig(os.path.join(outdir, "weekly_total_hours.png"))
     plt.close()
 
-def plot_monthly_total_hours(df_monthly_total, outdir):
-    """Creates a line graph of the monthly total hours."""
+def plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage):
+    """Creates a line graph of the monthly total hours with a dynamic goal line (or no line if goal_percentage is None)."""
     df_monthly_total = df_monthly_total.reset_index()
     
     # Corrected: Use 'start_time' column for formatting the month
@@ -397,6 +406,17 @@ def plot_monthly_total_hours(df_monthly_total, outdir):
     plt.ylabel("Total Hours")
     plt.xticks(rotation=45)
     plt.grid(True)
+    
+    ax = plt.gca()
+
+    # --- Conditional Goal Line Logic ---
+    if goal_percentage is not None and isinstance(goal_percentage, (int, float)):
+        # Calculate goal line: Using standard 30 days * 24 hours = 720 total hours
+        monthly_goal_hours = (30 * 24) * (goal_percentage / 100)
+        # Add a red dashed horizontal line at the goal percentage mark
+        ax.axhline(y=monthly_goal_hours, color='red', linestyle='--', label=f'{goal_percentage}% Goal ({monthly_goal_hours:.1f} hrs)')
+        ax.legend()
+
     plt.tight_layout()
     plt.savefig(os.path.join(outdir, "monthly_total_hours.png"))
     plt.close()
@@ -421,12 +441,13 @@ def plot_avg_hours_distribution(user_summary, outdir):
     plt.savefig(os.path.join(outdir, "avg_hours_distribution.png"))
     plt.close()
 
-def run_analysis(input_files, outdir, start_filter=None, end_filter=None):
+def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_percentage=10):
     """
     Orchestrates the entire analysis process.
     
     :param start_filter: Optional. A string representing the start date (e.g., "2024-01-01") or a year (e.g., "2024").
     :param end_filter: Optional. A string representing the end date (e.g., "2024-12-31") or a year (e.g., "2024").
+    :param goal_percentage: The target percentage for weekly/monthly hours for goal lines on charts. Pass None to disable the line.
     """
     
     # ----------------------------------------------------
@@ -553,8 +574,10 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None):
     export_weekly_likelihood_metrics(df, outdir)
     plot_hourly_distribution(df, outdir)
     plot_binary_hourly_distribution(df, outdir)
-    plot_weekly_total_hours(df, outdir)
-    plot_monthly_total_hours(df_monthly_total, outdir)
+    
+    # Call plotting functions with goal_percentage which can now be None
+    plot_weekly_total_hours(df, outdir, goal_percentage)
+    plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage)
     plot_avg_hours_distribution(user_summary, outdir)
     
     # print(f"All dashboard graphs and files have been saved to the '{outdir}' folder.")
