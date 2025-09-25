@@ -158,7 +158,7 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     metrics.append({"Metric": "Last 7 Days Hours Filled (%)", "Value": f"{pct_last_7:.2f}%"})
     metrics.append({"Metric": "Previous 7 Days Hours Filled (%)", "Value": f"{pct_prev_7:.2f}%"})
     
-    # Updated to 28-day metrics
+    # 28-day metrics
     metrics.append({"Metric": "Total Hours Last 28 Days", "Value": f"{hours_last_28:.2f}"})
     metrics.append({"Metric": "Unique Users Last 28 Days", "Value": f"{users_last_28}"})
     metrics.append({"Metric": "Total Hours Previous 28 Days", "Value": f"{hours_prev_28:.2f}"})
@@ -439,7 +439,7 @@ def plot_avg_hours_distribution(user_summary, outdir):
 
 def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_percentage=10):
     """
-    Orchestrates the entire analysis process.
+    Runs the entire analysis process.
     
     :param start_filter: Optional. A string representing the start date (e.g., "2024-01-01") or a year (e.g., "2024").
     :param end_filter: Optional. A string representing the end date (e.g., "2024-12-31") or a year (e.g., "2024").
@@ -503,7 +503,7 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
         # Warning print removed
         filter_start_date, filter_end_date = filter_end_date, filter_start_date
         
-    # --- Update OUTDIR to include the analyzed date range ---
+    # --- Update OUTDIR to include the analysed date range ---
     date_range_str = f"_{filter_start_date.strftime('%Y%m%d')}_to_{filter_end_date.strftime('%Y%m%d')}"
     final_outdir = outdir.rstrip("/\\") + date_range_str
     
@@ -547,7 +547,7 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     
     check_short_sessions(df)
     
-    # Group by month start for plotting purposes (index is now a Timestamp)
+    # Group by month start for plotting purposes
     df_monthly_total = df.groupby(pd.Grouper(key="start_time", freq="MS"))["duration"].sum()
 
     metrics = calculate_dashboard_metrics(df, df_monthly_total)
@@ -558,15 +558,112 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     all_metrics = metrics + regular_metrics
     metrics_df = pd.DataFrame(all_metrics)
     metrics_df.to_csv(os.path.join(outdir, "dashboard_summary.csv"), index=False)
-    
-    # All analysis complete messages removed
-    
+      
     export_top_10_slots(df, outdir)
     export_weekly_likelihood_metrics(df, outdir)
     plot_hourly_distribution(df, outdir)
     plot_binary_hourly_distribution(df, outdir)
     
-    # Call plotting functions with goal_percentage which can now be None
+    # Call plotting functions with goal_percentage
     plot_weekly_total_hours(df, outdir, goal_percentage)
     plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage)
     plot_avg_hours_distribution(user_summary, outdir)
+
+
+# --- New Functions for Streamlit App (Add to prayer_analytics_lib.py) ---
+
+def calculate_time_period_stats(df, days):
+    """Calculates hours and unique users for a given time period (e.g., 7 days) and the preceding period."""
+    today = pd.Timestamp.now().normalize()
+    end_current = today + timedelta(days=1) # up to the start of today
+    start_current = end_current - timedelta(days=days)
+    
+    start_previous = start_current - timedelta(days=days)
+    end_previous = start_current
+    
+    # Filter for current period
+    df_current = df[(df["start_time"] >= start_current) & (df["start_time"] < end_current)]
+    current_hours = df_current["duration"].sum().round(2)
+    current_unique_users = df_current["person_key"].nunique()
+    
+    # Filter for previous period
+    df_previous = df[(df["start_time"] >= start_previous) & (df["start_time"] < end_previous)]
+    previous_hours = df_previous["duration"].sum().round(2)
+
+    # Calculate percentage change
+    if previous_hours > 0:
+        change_pct = ((current_hours - previous_hours) / previous_hours) * 100
+    elif current_hours > 0:
+        change_pct = 100.0 # From zero to a positive number
+    else:
+        change_pct = 0.0
+        
+    return current_hours, current_unique_users, change_pct
+
+def calculate_fortnightly_regulars_metrics(df, user_summary, outdir):
+    """
+    Calculates the number of users who average > 1 hour per 14-day period.
+    This metric is based on the entire filtered dataset.
+    """
+    total_days = (df["start_time"].max().normalize() - df["start_time"].min().normalize()).days
+    if total_days < 14:
+        # If the total duration is less than 14 days, base the calculation on 14 days.
+        fortnight_count = 1 
+    else:
+        # Calculate the number of full fortnight periods in the data
+        fortnight_count = max(1, total_days / 14)
+
+    # Calculate average duration per user per fortnight
+    user_summary["avg_hours_per_fortnight"] = user_summary["total_hours"] / fortnight_count
+
+    # UPDATED: Define a fortnight regular as someone averaging > 1 hour per fortnight
+    fortnight_regulars_df = user_summary[user_summary["avg_hours_per_fortnight"] > 1]
+    num_fortnight_regulars = len(fortnight_regulars_df)
+
+    # Calculate hours contributed by fortnight regulars
+    hours_by_fortnight_regulars = fortnight_regulars_df["total_hours"].sum()
+    total_hours = user_summary["total_hours"].sum()
+    
+    hours_pct = (hours_by_fortnight_regulars / total_hours) * 100 if total_hours > 0 else 0
+
+    return [
+        {
+            "Metric": "Number of Fortnightly Regulars",
+            "Value": num_fortnight_regulars
+        },
+        {
+            "Metric": "Total Hours by Fortnightly Regulars (%)",
+            "Value": f"{hours_pct:.1f}%"
+        },
+    ]
+
+def calculate_average_metrics(df):
+    """Calculates average hours per week/month based on the filtered data period."""
+    if df.empty:
+        return []
+    
+    data_min_date = df["start_time"].min().normalize()
+    data_max_date = df["start_time"].max().normalize()
+    total_days = (data_max_date - data_min_date).days + 1
+    
+    if total_days == 0:
+        return []
+
+    total_hours = df["duration"].sum()
+    
+    # Calculate average hours per calendar week (7 days)
+    avg_hours_per_week = (total_hours / total_days) * 7
+    
+    # Calculate average hours per calendar month (approx 30.44 days)
+    avg_hours_per_month = (total_hours / total_days) * 30.44
+
+    return [
+        {
+            "Metric": "Avg Hours per Week (Filtered Period)",
+            "Value": f"{avg_hours_per_week:.1f}"
+        },
+        {
+            "Metric": "Avg Hours per Month (Filtered Period)",
+            "Value": f"{avg_hours_per_month:.1f}"
+        },
+    ]

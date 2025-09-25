@@ -52,7 +52,7 @@ else:
 
 
 if __name__ == "__main__":
-    print("--- Prayer Analysis Script ---")
+    print("--- Prayer Room Analysis ---")
     print(f"GWOP data: {gwop_status}")
     
     if START_FILTER or END_FILTER:
