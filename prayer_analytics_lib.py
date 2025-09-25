@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 from datetime import timedelta
 import matplotlib.dates as mdates
+import sys
 
 # -----------------------
 # Core Functions
@@ -116,6 +117,8 @@ def calculate_dashboard_metrics(df, df_monthly_total):
 
     # --- RECENTLY ---
     today_ts = pd.Timestamp.now().normalize()
+    
+    # 7-Day Periods (No Change)
     last_7_days_start = today_ts - timedelta(days=7)
     prev_7_days_start = today_ts - timedelta(days=14)
     
@@ -124,33 +127,48 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     
     hours_last_7 = df_last_7["duration"].sum()
     hours_prev_7 = df_prev_7["duration"].sum()
+    users_last_7 = df_last_7["person_key"].nunique()
+    users_prev_7 = df_prev_7["person_key"].nunique()
     
     total_possible_hours_7 = 7 * 24
     pct_last_7 = (hours_last_7 / total_possible_hours_7) * 100 if total_possible_hours_7 > 0 else 0
     pct_prev_7 = (hours_prev_7 / total_possible_hours_7) * 100 if total_possible_hours_7 > 0 else 0
 
-    last_month_end = today_ts.to_period('M').to_timestamp()
-    last_month_start = last_month_end - pd.offsets.MonthBegin(1)
-    prev_month_end = last_month_start - pd.offsets.Day(1)
-    prev_month_start = prev_month_end.to_period('M').to_timestamp()
+    # Monthly Periods: Now changed to 28-Day Periods (4 Weeks)
+    last_28_days_start = today_ts - timedelta(days=28)
+    prev_28_days_start = today_ts - timedelta(days=56)
     
-    hours_last_month = df_monthly_total.iloc[-1] if not df_monthly_total.empty and len(df_monthly_total) >= 1 else 0
-    hours_prev_month = df_monthly_total.iloc[-2] if len(df_monthly_total) >= 2 else 0
+    # Filter dataframes for the actual 28-day periods
+    df_last_28 = df[(df["start_time"] >= last_28_days_start) & (df["start_time"] < today_ts)]
+    df_prev_28 = df[(df["start_time"] >= prev_28_days_start) & (df["start_time"] < last_28_days_start)]
+    
+    hours_last_28 = df_last_28["duration"].sum()
+    hours_prev_28 = df_prev_28["duration"].sum()
+    users_last_28 = df_last_28["person_key"].nunique()
+    users_prev_28 = df_prev_28["person_key"].nunique()
 
-    total_possible_hours_last_month = (last_month_end - last_month_start).days * 24
-    total_possible_hours_prev_month = (prev_month_end - prev_month_start).days * 24
+    # Calculate total possible hours for the 28-day period: 28 * 24 = 672
+    total_possible_hours_28 = 28 * 24
 
-    pct_last_month = (hours_last_month / total_possible_hours_last_month) * 100 if total_possible_hours_last_month > 0 else 0
-    pct_prev_month = (hours_prev_month / total_possible_hours_prev_month) * 100 if total_possible_hours_prev_month > 0 else 0
+    pct_last_28 = (hours_last_28 / total_possible_hours_28) * 100 if total_possible_hours_28 > 0 else 0
+    pct_prev_28 = (hours_prev_28 / total_possible_hours_28) * 100 if total_possible_hours_28 > 0 else 0
+    
+    # --- Add Metrics to List ---
     
     metrics.append({"Metric": "Total Hours Last 7 Days", "Value": f"{hours_last_7:.2f}"})
+    metrics.append({"Metric": "Unique Users Last 7 Days", "Value": f"{users_last_7}"})
     metrics.append({"Metric": "Total Hours Previous 7 Days", "Value": f"{hours_prev_7:.2f}"})
+    metrics.append({"Metric": "Unique Users Previous 7 Days", "Value": f"{users_prev_7}"})
     metrics.append({"Metric": "Last 7 Days Hours Filled (%)", "Value": f"{pct_last_7:.2f}%"})
     metrics.append({"Metric": "Previous 7 Days Hours Filled (%)", "Value": f"{pct_prev_7:.2f}%"})
-    metrics.append({"Metric": "Total Hours Last Month", "Value": f"{hours_last_month:.2f}"})
-    metrics.append({"Metric": "Total Hours Previous Month", "Value": f"{hours_prev_month:.2f}"})
-    metrics.append({"Metric": "Last Month Hours Filled (%)", "Value": f"{pct_last_month:.2f}%"})
-    metrics.append({"Metric": "Previous Month Hours Filled (%)", "Value": f"{pct_prev_month:.2f}%"})
+    
+    # Updated to 28-day metrics
+    metrics.append({"Metric": "Total Hours Last 28 Days", "Value": f"{hours_last_28:.2f}"})
+    metrics.append({"Metric": "Unique Users Last 28 Days", "Value": f"{users_last_28}"})
+    metrics.append({"Metric": "Total Hours Previous 28 Days", "Value": f"{hours_prev_28:.2f}"})
+    metrics.append({"Metric": "Unique Users Previous 28 Days", "Value": f"{users_prev_28}"})
+    metrics.append({"Metric": "Last 28 Days Hours Filled (%)", "Value": f"{pct_last_28:.2f}%"})
+    metrics.append({"Metric": "Previous 28 Days Hours Filled (%)", "Value": f"{pct_prev_28:.2f}%"})
     
     return metrics
 
@@ -369,8 +387,8 @@ def plot_monthly_total_hours(df_monthly_total, outdir):
     """Creates a line graph of the monthly total hours."""
     df_monthly_total = df_monthly_total.reset_index()
     
-    # Format the dates for the x-axis
-    df_monthly_total["month"] = df_monthly_total["month"].dt.strftime('%b %Y')
+    # Corrected: Use 'start_time' column for formatting the month
+    df_monthly_total["month"] = df_monthly_total["start_time"].dt.strftime('%b %Y')
     
     plt.figure(figsize=(10, 5))
     plt.plot(df_monthly_total["month"], df_monthly_total["duration"], marker='o')
@@ -403,17 +421,93 @@ def plot_avg_hours_distribution(user_summary, outdir):
     plt.savefig(os.path.join(outdir, "avg_hours_distribution.png"))
     plt.close()
 
-def run_analysis(input_files, outdir):
-    """Orchestrates the entire analysis process."""
-    os.makedirs(outdir, exist_ok=True)
+def run_analysis(input_files, outdir, start_filter=None, end_filter=None):
+    """
+    Orchestrates the entire analysis process.
     
+    :param start_filter: Optional. A string representing the start date (e.g., "2024-01-01") or a year (e.g., "2024").
+    :param end_filter: Optional. A string representing the end date (e.g., "2024-12-31") or a year (e.g., "2024").
+    """
+    
+    # ----------------------------------------------------
+    # 1. LOAD, NORMALIZE, AND FILTER DATA
+    # ----------------------------------------------------
     df = load_and_combine_csvs(input_files)
     df = normalize_columns(df)
     
     today = pd.Timestamp.now().normalize()
+    
+    # Determine overall min/max dates from raw data
+    data_min_date = df["start_time"].min().normalize()
+    
+    # Set default filter dates: start from min data date, end today
+    filter_start_date = data_min_date
+    filter_end_date = today
+    
+    # Process start_filter input
+    if start_filter:
+        try:
+            # Check if it's a year (4 digits)
+            if str(start_filter).isdigit() and len(str(start_filter)) == 4:
+                year = int(start_filter)
+                filter_start_date = pd.to_datetime(f"{year}-01-01").normalize()
+                # If only a start year is provided, set end to the end of that year
+                if not end_filter:
+                    filter_end_date = pd.to_datetime(f"{year}-12-31").normalize()
+            # Otherwise, assume it's a date string
+            else:
+                filter_start_date = pd.to_datetime(start_filter, errors='coerce').normalize()
+                if pd.isna(filter_start_date):
+                     print(f"Warning: Could not parse start date filter '{start_filter}'. Using earliest data date.")
+                     filter_start_date = data_min_date
+        except Exception as e:
+            print(f"Error processing start_filter: {e}. Using earliest data date.")
+            filter_start_date = data_min_date
+            
+    # Process end_filter input
+    if end_filter:
+        try:
+            # Check if it's a year (4 digits)
+            if str(end_filter).isdigit() and len(str(end_filter)) == 4:
+                year = int(end_filter)
+                filter_end_date = pd.to_datetime(f"{year}-12-31").normalize()
+            # Otherwise, assume it's a date string
+            else:
+                filter_end_date = pd.to_datetime(end_filter, errors='coerce').normalize()
+                if pd.isna(filter_end_date):
+                    print(f"Warning: Could not parse end date filter '{end_filter}'. Using current date.")
+                    filter_end_date = today
+        except Exception as e:
+            print(f"Error processing end_filter: {e}. Using current date.")
+            filter_end_date = today
+
+    # Ensure start is before end and handle time boundary
+    if filter_start_date > filter_end_date:
+        print("Warning: Start date is after end date. Swapping dates.")
+        filter_start_date, filter_end_date = filter_end_date, filter_start_date
+        
+    # --- Update OUTDIR to include the analyzed date range ---
+    date_range_str = f"_{filter_start_date.strftime('%Y%m%d')}_to_{filter_end_date.strftime('%Y%m%d')}"
+    final_outdir = outdir.rstrip("/\\") + date_range_str
+    
+    # Apply filtering
+    df = df[(df["start_time"].dt.normalize() >= filter_start_date) & (df["start_time"].dt.normalize() <= filter_end_date)]
+    
+    if df.empty:
+        raise ValueError(f"No data found between {filter_start_date.strftime('%Y-%m-%d')} and {filter_end_date.strftime('%Y-%m-%d')}. Analysis aborted.")
+        
+    # Reassign outdir to the date-specific folder and create it
+    outdir = final_outdir
+    os.makedirs(outdir, exist_ok=True)
+    
+    # Drop NaNs and ensure data is before 'today' (which is the upper bound of the filter)
     df = df[df["start_time"] <= today]
     df = df.dropna(subset=["start_time", "end_time"])
 
+    # ----------------------------------------------------
+    # 2. RUN ANALYSIS
+    # ----------------------------------------------------
+    
     # Load email duplicates and create a lookup map
     email_dupes_path = "email_duplicates.csv"
     email_map = {}
@@ -434,10 +528,10 @@ def run_analysis(input_files, outdir):
     )
     df = calculate_hours(df)
     
-    check_short_sessions(df)
+    # check_short_sessions(df)
     
-    df["month"] = df["start_time"].dt.to_period('M')
-    df_monthly_total = df.groupby("month")["duration"].sum()
+    # Group by month start for plotting purposes (index is now a Timestamp)
+    df_monthly_total = df.groupby(pd.Grouper(key="start_time", freq="MS"))["duration"].sum()
 
     metrics = calculate_dashboard_metrics(df, df_monthly_total)
     
@@ -448,11 +542,12 @@ def run_analysis(input_files, outdir):
     metrics_df = pd.DataFrame(all_metrics)
     metrics_df.to_csv(os.path.join(outdir, "dashboard_summary.csv"), index=False)
     
-    print("Dashboard summary has been saved to dashboard_summary.csv.")
-    print("User summary with first name, last name, mobile, and email has been saved to user.csv.")
-    print("Top 10 most booked slots (by total raw bookings) have been exported to top_10_slots.csv.")
-    print("Weekly slot likelihood metrics (Top 3 Volume and Top 3 Probability) have been exported to weekly_slot_likelihood.csv.")
-    print("The full 168-slot probability table has been exported to unique_user_slot_probability.csv, where all probabilities sum to 1.")
+    # print(f"--- Analysis for period: {filter_start_date.strftime('%Y-%m-%d')} to {filter_end_date.strftime('%Y-%m-%d')} ---")
+    # print("Dashboard summary has been saved to dashboard_summary.csv.")
+    # print("User summary with first name, last name, mobile, and email has been saved to user.csv.")
+    # print("Top 10 most booked slots (by total raw bookings) have been exported to top_10_slots.csv.")
+    # print("Weekly slot likelihood metrics (Top 3 Volume and Top 3 Probability) have been exported to weekly_slot_likelihood.csv.")
+    # print("The full 168-slot probability table has been exported to unique_user_slot_probability.csv, where all probabilities sum to 1.")
 
     export_top_10_slots(df, outdir)
     export_weekly_likelihood_metrics(df, outdir)
@@ -462,4 +557,4 @@ def run_analysis(input_files, outdir):
     plot_monthly_total_hours(df_monthly_total, outdir)
     plot_avg_hours_distribution(user_summary, outdir)
     
-    print(f"All dashboard graphs have been saved to the '{outdir}' folder.")
+    # print(f"All dashboard graphs and files have been saved to the '{outdir}' folder.")
