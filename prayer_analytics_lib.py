@@ -28,8 +28,7 @@ def load_and_combine_csvs(file_paths):
                 df["start_time"] = pd.to_datetime(df["start_time"], errors="coerce")
                 df["end_time"] = pd.to_datetime(df["end_time"], errors="coerce")
             dfs.append(df)
-        else:
-            print(f"Warning: File not found at {path}. Skipping.")
+        # File not found warning is removed as requested
     if not dfs:
         raise FileNotFoundError("No CSV files found from the provided paths.")
     df = pd.concat(dfs, ignore_index=True)
@@ -72,13 +71,10 @@ def calculate_hours(df):
     return df
 
 def check_short_sessions(df):
-    """Prints a summary of all sessions with a duration of less than 1 hour."""
+    """Removed all print statements for short session checks."""
     short_sessions = df[df["duration"] < 1]
-    if not short_sessions.empty:
-        print("\n--- Sessions less than 1 hour found ---")
-        print(short_sessions[["person_name", "start_time", "duration"]])
-    else:
-        print("\n--- No sessions less than 1 hour were found in the data. ---")
+    # No action/output if sessions are found or not found
+    pass
 
 # -----------------------
 # Dashboard Metrics
@@ -213,7 +209,7 @@ def export_user_summary_to_csv(df, outdir):
     return user_summary
 
 def calculate_regulars_metrics(df, user_summary, outdir):
-    """Identifies regulars, exports their lists, and prints metrics."""
+    """Identifies regulars, exports their lists, and returns metrics."""
     # Define regulars based on new logic
     weekly_regulars = user_summary[user_summary["weekly_avg_hours"] >= 1]["person_key"].tolist()
     fortnightly_regulars = user_summary[user_summary["fortnightly_avg_hours"] >= 1]["person_key"].tolist()
@@ -478,11 +474,11 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
             # Otherwise, assume it's a date string
             else:
                 filter_start_date = pd.to_datetime(start_filter, errors='coerce').normalize()
+                # Fallback silently if parsing fails
                 if pd.isna(filter_start_date):
-                     print(f"Warning: Could not parse start date filter '{start_filter}'. Using earliest data date.")
                      filter_start_date = data_min_date
-        except Exception as e:
-            print(f"Error processing start_filter: {e}. Using earliest data date.")
+        except Exception:
+            # Fallback silently if an unexpected error occurs
             filter_start_date = data_min_date
             
     # Process end_filter input
@@ -495,16 +491,16 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
             # Otherwise, assume it's a date string
             else:
                 filter_end_date = pd.to_datetime(end_filter, errors='coerce').normalize()
+                # Fallback silently if parsing fails
                 if pd.isna(filter_end_date):
-                    print(f"Warning: Could not parse end date filter '{end_filter}'. Using current date.")
                     filter_end_date = today
-        except Exception as e:
-            print(f"Error processing end_filter: {e}. Using current date.")
+        except Exception:
+            # Fallback silently if an unexpected error occurs
             filter_end_date = today
 
     # Ensure start is before end and handle time boundary
     if filter_start_date > filter_end_date:
-        print("Warning: Start date is after end date. Swapping dates.")
+        # Warning print removed
         filter_start_date, filter_end_date = filter_end_date, filter_start_date
         
     # --- Update OUTDIR to include the analyzed date range ---
@@ -549,7 +545,7 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     )
     df = calculate_hours(df)
     
-    # check_short_sessions(df)
+    check_short_sessions(df)
     
     # Group by month start for plotting purposes (index is now a Timestamp)
     df_monthly_total = df.groupby(pd.Grouper(key="start_time", freq="MS"))["duration"].sum()
@@ -563,13 +559,8 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     metrics_df = pd.DataFrame(all_metrics)
     metrics_df.to_csv(os.path.join(outdir, "dashboard_summary.csv"), index=False)
     
-    # print(f"--- Analysis for period: {filter_start_date.strftime('%Y-%m-%d')} to {filter_end_date.strftime('%Y-%m-%d')} ---")
-    # print("Dashboard summary has been saved to dashboard_summary.csv.")
-    # print("User summary with first name, last name, mobile, and email has been saved to user.csv.")
-    # print("Top 10 most booked slots (by total raw bookings) have been exported to top_10_slots.csv.")
-    # print("Weekly slot likelihood metrics (Top 3 Volume and Top 3 Probability) have been exported to weekly_slot_likelihood.csv.")
-    # print("The full 168-slot probability table has been exported to unique_user_slot_probability.csv, where all probabilities sum to 1.")
-
+    # All analysis complete messages removed
+    
     export_top_10_slots(df, outdir)
     export_weekly_likelihood_metrics(df, outdir)
     plot_hourly_distribution(df, outdir)
@@ -579,5 +570,3 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     plot_weekly_total_hours(df, outdir, goal_percentage)
     plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage)
     plot_avg_hours_distribution(user_summary, outdir)
-    
-    # print(f"All dashboard graphs and files have been saved to the '{outdir}' folder.")

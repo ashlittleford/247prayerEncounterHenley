@@ -10,39 +10,50 @@ except ImportError:
     sys.exit(1)
 
 # ----------------------------------------------------------------------
-# ⚠️ EDIT THESE PARAMETERS TO SET THE DATE RANGE FOR YOUR ANALYSIS ⚠️
+# ⚠️ EDIT THESE PARAMETERS TO SET THE ANALYSIS CONFIGURATION ⚠️
 # ----------------------------------------------------------------------
+
+# Option to include data from 'gwop.csv'. Set to "YES" or "NO".
+INCLUDE_GWOP = "YES"
 
 # OPTIONAL: Define the START date for the analysis.
 # - To use all data: set to None
-# - To filter by a year: "2024" (uses Jan 1st to Dec 31st)
+# - To filter by a year: "2024"
 # - To filter by a specific date: "2025-01-01"
 START_FILTER = None
 
 # OPTIONAL: Define the END date for the analysis.
 # - To use data until today: set to None
-# - To filter by a year: "2024" (uses Jan 1st to Dec 31st)
+# - To filter by a year: "2024"
 # - To filter by a specific date: "2024-12-31"
 END_FILTER = None
 
-# The percentage goal for the hours filled (e.g., 10 for 10%)
+# The percentage goal for the hours filled (e.g., 10 for 10%).
 # Setting this to None will result in no goal line being drawn on the charts.
-GOAL_PERCENTAGE = 10
+GOAL_PERCENTAGE = 10 
 
 # ----------------------------------------------------------------------
 # DO NOT EDIT BELOW THIS LINE
 # ----------------------------------------------------------------------
 
-# The file(s) containing historical booking data.
-# E.g., ["initial.csv", "current.csv"]
-INPUT_FILES = ["initial.csv", "current.csv"]
+# Set input files and output directory based on the GWOP option
+BASE_INPUT_FILES = ["initial.csv", "current.csv"]
 
-# The base name for the output directory.
-# A date range suffix will be automatically appended (e.g., "analysis_20240101_to_20241231").
-OUTPUT_DIR = "out"
+if INCLUDE_GWOP.upper() == "YES":
+    INPUT_FILES = BASE_INPUT_FILES + ["gwop.csv"]
+    # Output directory suffix for GWOP inclusion
+    OUTPUT_DIR = "gwop_out"
+    gwop_status = "Included"
+else:
+    INPUT_FILES = BASE_INPUT_FILES
+    # Output directory suffix for standard analysis
+    OUTPUT_DIR = "out"
+    gwop_status = "Excluded"
+
 
 if __name__ == "__main__":
     print("--- Prayer Analysis Script ---")
+    print(f"GWOP data: {gwop_status}")
     
     if START_FILTER or END_FILTER:
         start_display = START_FILTER if START_FILTER else "Earliest Data"
@@ -51,10 +62,8 @@ if __name__ == "__main__":
     else:
         print("Filter set: Using all available data.")
         
-    if GOAL_PERCENTAGE is None:
-        print("Goal Percentage set to: None (No goal line will be drawn)")
-    else:
-        print(f"Goal Percentage set to: {GOAL_PERCENTAGE}%")
+    goal_display = f"{GOAL_PERCENTAGE}%" if GOAL_PERCENTAGE is not None else "None (No line)"
+    print(f"Goal Percentage set to: {goal_display}")
         
     try:
         pal.run_analysis(
@@ -64,7 +73,7 @@ if __name__ == "__main__":
             end_filter=END_FILTER,
             goal_percentage=GOAL_PERCENTAGE
         )
-        print("\n✅ Analysis complete. Check the output directory for results.")
+        print(f"\n✅ Analysis complete. Results saved to '{OUTPUT_DIR}'")
     except Exception as e:
         print(f"\n--- ❌ FATAL ERROR --- \nAn error occurred during analysis: {e}")
         print("Please check your input files and date filters in run_analytics.py.")
