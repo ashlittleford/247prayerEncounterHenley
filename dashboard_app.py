@@ -6,17 +6,26 @@ import os
 from io import BytesIO
 from datetime import timedelta
 import re 
+# import streamlit_authenticator as stauth  <-- REMOVED
 
 # Assuming prayer_analytics_lib.py is in the same directory
 import prayer_analytics_lib as pal 
 
 # --- CONFIGURATION & SETUP ---
 LOGO_FILE = "logo.png"          
-CUSTOM_LOGO_WIDTH = 150         
+CUSTOM_LOGO_WIDTH = 100         
 
+# 1. Set page config FIRST
 st.set_page_config(layout="wide", page_title="Prayer Room Analytics Dashboard")
 
-# --- CUSTOM CSS INJECTION (FIXES WARNING COLOR & LOGO CENTERING) ---
+
+# ======================================================================
+# 🔐 AUTHENTICATION BLOCK REMOVED 🔐
+# The application will now start immediately.
+# ======================================================================
+
+
+# --- CUSTOM CSS INJECTION ---
 CUSTOM_STYLE = """
 <style>
 /* 1. FIXES THE WARNING BOX COLOR */
@@ -55,7 +64,8 @@ else:
     st.sidebar.warning(f"Logo file '{LOGO_FILE}' not found. Please ensure it is in the same folder as the script.")
     
 st.title("Prayer Room Analytics Dashboard")
-st.markdown("Customize the analysis below and press **Run Analysis**.")
+st.markdown(f"Welcome to the **Prayer Room Analytics Dashboard**! Customize the analysis below and press **Run Analysis**.")
+st.sidebar.markdown('---')
 
 
 # --- 1. Sidebar for User Inputs (Customization) ---
@@ -170,6 +180,10 @@ def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percen
     # Final cleanup before analysis
     df = df[df["start_time"] <= today]
     df = df.dropna(subset=["start_time", "end_time"])
+    
+    # FIX for ValueError: cannot convert float NaN to integer issue on re-filter
+    df = df.dropna(subset=['start_time', 'end_time', 'person_key'])
+
 
     # ----------------------------------------------------
     # 3. RUN CORE ANALYSIS ON FILTERED DATA
@@ -199,7 +213,7 @@ def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percen
     # Calculate slot likelihoods
     likelihood_df = pal.export_weekly_likelihood_metrics(df, outdir)
     
-    # ADDITION: Manually calculate Total Sessions
+    # Manually calculate Total Sessions
     total_sessions_count = len(df)
     
     # Return dataframes needed for display
@@ -297,7 +311,6 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
     cols_reg[0].metric("Weekly Regulars (Avg $\ge$ 1hr/wk)", metric_dict.get("Number of Weekly Regulars", "N/A"))
     cols_reg[1].metric("Fortnightly Regulars (Avg $\ge$ 1hr/fn)", metric_dict.get("Number of Fortnightly Regulars", "N/A")) 
     cols_reg[2].metric("Hours by Weekly Regulars (%)", metric_dict.get("Total Hours by Weekly Regulars (%)", "N/A"))
-    # FIX: Use the calculated value instead of relying on metric_dict
     cols_reg[3].metric("Total Sessions", total_sessions_count)
 
     st.markdown("---")
@@ -338,7 +351,7 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
         metric_name = row["Metric"]
         bookings = row["Total Bookings"]
         
-        # 1. FINAL STRING CLEANUP
+        # 1. FINAL STRING CLEANUP (Needed to identify icon, but text is now simpler)
         junk_prefixes = ["Top Timeslot", "Timeslot", "Top"]
         
         clean_slot_description = metric_name
@@ -358,7 +371,7 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
             icon_for_rank = "⭐" 
 
         # 3. Construct the final desired string format: 
-        final_text = f"**# {i+1} -** {clean_slot_description} with **{bookings}** bookings"
+        final_text = f"**# {i+1} - {bookings}**" # Simplified as requested
         
         st.warning(final_text, icon=icon_for_rank)
 
