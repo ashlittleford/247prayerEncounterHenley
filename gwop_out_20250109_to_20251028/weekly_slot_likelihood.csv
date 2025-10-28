@@ -1,0 +1,7 @@
+Metric,weekday,hour,Likelihood Value
+Top 3 - Avg Bookings per Week (Volume),Monday,6,0.3849
+Top 3 - Avg Bookings per Week (Volume),Tuesday,19,0.3608
+Top 3 - Avg Bookings per Week (Volume),Tuesday,9,0.2646
+Top 3 - Slot Selection Probability (Unique User),Saturday,8,0.0203
+Top 3 - Slot Selection Probability (Unique User),Saturday,10,0.0203
+Top 3 - Slot Selection Probability (Unique User),Saturday,11,0.0169
