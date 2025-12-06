@@ -127,12 +127,12 @@ if goal_percentage == 0:
 
 # Customization 4: Pray Day Dates
 st.sidebar.subheader("Pray Day Configuration")
-default_pray_days = "2025-02-22\n2025-05-24\n2025-12-06"
+# Removed pre-filled default dates as per user request to avoid confusion.
 pray_days_input = st.sidebar.text_area(
     "Pray Day Dates (YYYY-MM-DD)",
-    value=default_pray_days,
+    placeholder="2025-02-22\n2025-05-24\n2025-12-06",
     height=100,
-    help="Enter each Pray Day date on a new line."
+    help="Enter each Pray Day date on a new line (YYYY-MM-DD)."
 )
 
 # Parse Pray Days
@@ -153,6 +153,43 @@ OUTPUT_DIR = "temp_dashboard_out"
 
 
 # --- Helper functions to run the library and display results ---
+
+def display_pray_day_results(df, pray_day_dates):
+    """
+    Computes and displays Pray Days analytics.
+    """
+    if not pray_day_dates:
+        st.info("No Pray Day dates provided.")
+        return
+
+    # Call the library function
+    results = pal.analyze_pray_days(df, pray_day_dates)
+
+    st.header("Pray Days Analysis")
+
+    # Global Metric
+    st.metric("Total Repeaters (Attended > 1 Pray Day)", results["repeaters_count"])
+
+    st.subheader("Per Pray Day Breakdown")
+    summary_df = results["summary_df"]
+
+    if summary_df.empty:
+        st.write("No bookings found for the specified Pray Days.")
+    else:
+        # Format dates for better display
+        summary_df["Date"] = pd.to_datetime(summary_df["Date"]).dt.strftime('%Y-%m-%d')
+        st.dataframe(summary_df, use_container_width=True)
+
+        st.markdown("""
+        **Metric Explanations:**
+        - **Total Participants:** Unique users who booked on this Pray Day.
+        - **>1 Hour Participants:** Users who prayed for more than 1 hour (aggregated) on this day.
+        - **Done Pray Day Before:** Users who had participated in at least one *previous* Pray Day from your list.
+        - **Done Regular Before:** Users who have booked a slot on a non-Pray Day date *before* this Pray Day.
+        - **New Users Retained:** Users whose *first ever* booking was on this Pray Day, and who subsequently booked another slot on a later date.
+        - **Total New Users:** Users whose *first ever* booking was on this Pray Day.
+        """)
+
 
 def format_change_metric(change_pct):
     """
@@ -551,38 +588,3 @@ if st.sidebar.button("Run Analysis"):
 if not st.session_state.get("df_loaded", False):
     st.info("Set your analysis parameters in the sidebar and click **Run Analysis** to generate the dashboard.")
     st.session_state["df_loaded"] = True
-def display_pray_day_results(df, pray_day_dates):
-    """
-    Computes and displays Pray Days analytics.
-    """
-    if not pray_day_dates:
-        st.info("No Pray Day dates provided.")
-        return
-
-    # Call the library function
-    results = pal.analyze_pray_days(df, pray_day_dates)
-
-    st.header("Pray Days Analysis")
-
-    # Global Metric
-    st.metric("Total Repeaters (Attended > 1 Pray Day)", results["repeaters_count"])
-
-    st.subheader("Per Pray Day Breakdown")
-    summary_df = results["summary_df"]
-
-    if summary_df.empty:
-        st.write("No bookings found for the specified Pray Days.")
-    else:
-        # Format dates for better display
-        summary_df["Date"] = pd.to_datetime(summary_df["Date"]).dt.strftime('%Y-%m-%d')
-        st.dataframe(summary_df, use_container_width=True)
-
-        st.markdown("""
-        **Metric Explanations:**
-        - **Total Participants:** Unique users who booked on this Pray Day.
-        - **>1 Hour Participants:** Users who prayed for more than 1 hour (aggregated) on this day.
-        - **Done Pray Day Before:** Users who had participated in at least one *previous* Pray Day from your list.
-        - **Done Regular Before:** Users who have booked a slot on a non-Pray Day date *before* this Pray Day.
-        - **New Users Retained:** Users whose *first ever* booking was on this Pray Day, and who subsequently booked another slot on a later date.
-        - **Total New Users:** Users whose *first ever* booking was on this Pray Day.
-        """)
