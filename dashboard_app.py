@@ -70,6 +70,38 @@ st.sidebar.markdown('---')
 
 # --- 1. Sidebar for User Inputs (Customization) ---
 
+st.sidebar.header("Data Management")
+
+# Display Last Updated Date
+if os.path.exists("current.csv"):
+    last_modified_timestamp = os.path.getmtime("current.csv")
+    last_modified_date = pd.to_datetime(last_modified_timestamp, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+    st.sidebar.write(f"**current.csv** last updated:\n{last_modified_date}")
+else:
+    st.sidebar.warning("current.csv not found.")
+
+# File Uploader
+uploaded_file = st.sidebar.file_uploader("Upload new current.csv", type=['csv'])
+
+if uploaded_file is not None:
+    # Option to commit/replace
+    if st.sidebar.button("Replace current.csv with uploaded file"):
+        # Save the file
+        try:
+            with open("current.csv", "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.session_state['upload_success'] = True
+            # Trigger a rerun to update the date and potentially the analysis
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"Error saving file: {e}")
+
+if st.session_state.get('upload_success'):
+    st.sidebar.success("current.csv updated successfully!")
+    st.session_state['upload_success'] = False
+
+st.sidebar.markdown('---')
+
 st.sidebar.header("Configuration")
 
 # Customization 1: Include GWOP Data
