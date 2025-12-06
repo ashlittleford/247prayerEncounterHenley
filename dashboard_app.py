@@ -16,7 +16,7 @@ LOGO_FILE = "logo.png"
 CUSTOM_LOGO_WIDTH = 100         
 
 # 1. Set page config FIRST
-st.set_page_config(layout="wide", page_title="Prayer Room Analytics Dashboard")
+st.set_page_config(layout="wide", page_title="Encounter Henley Prayer Room Insights")
 
 
 # ======================================================================
@@ -28,6 +28,12 @@ st.set_page_config(layout="wide", page_title="Prayer Room Analytics Dashboard")
 # --- CUSTOM CSS INJECTION ---
 CUSTOM_STYLE = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Montserrat', sans-serif;
+}
+
 /* 1. FIXES THE WARNING BOX COLOR */
 .stAlert-warning {
     background-color: #7A8AB2 !important; 
@@ -41,14 +47,6 @@ CUSTOM_STYLE = """
 .stAlert-warning p { 
     color: white !important; 
 }
-
-/* 2. CENTERS THE LOGO IN THE SIDEBAR */
-.st-emotion-cache-1mn4s5 { 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
 </style>
 """
 st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
@@ -59,12 +57,15 @@ st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
 
 logo_path_exists = os.path.exists(LOGO_FILE)
 if logo_path_exists:
-    st.sidebar.image(LOGO_FILE, width=CUSTOM_LOGO_WIDTH)
+    # Center the logo using columns
+    left_co, cent_co, last_co = st.sidebar.columns(3)
+    with cent_co:
+        st.image(LOGO_FILE, width=CUSTOM_LOGO_WIDTH)
 else:
     st.sidebar.warning(f"Logo file '{LOGO_FILE}' not found. Please ensure it is in the same folder as the script.")
     
-st.title("Prayer Room Analytics Dashboard")
-st.markdown(f"Welcome to the **Prayer Room Analytics Dashboard**! Customize the analysis below and press **Run Analysis**.")
+st.title("Encounter Henley Prayer Room Insights")
+st.markdown(f"Discovering prayer impact from the city to beach. Customise the analysis below and press **Run Analysis**.")
 st.sidebar.markdown('---')
 
 
