@@ -667,3 +667,129 @@ def calculate_average_metrics(df):
             "Value": f"{avg_hours_per_month:.1f}"
         },
     ]
+def analyze_pray_days(df, pray_day_dates):
+    """
+    Analyzes data specifically for Pray Days.
+
+    Args:
+        df: The main dataframe with 'start_time', 'end_time', 'person_key', 'duration'.
+        pray_day_dates: A list of datetime.date objects representing the Pray Days.
+
+    Returns:
+        A dictionary containing:
+        - 'repeaters_count': int
+        - 'summary_df': pd.DataFrame with per-Pray Day metrics.
+    """
+    # Create a copy to avoid SettingWithCopy warnings on the original df
+    df = df.copy()
+
+    # Ensure pray_day_dates are sorted unique dates
+    pray_day_dates = sorted(list(set(pray_day_dates)))
+
+    # Add date column for easy filtering
+    df['date'] = df['start_time'].dt.date
+
+    # 1. Global Metric: Repeaters (Users who attended > 1 Pray Day)
+    pray_day_bookings = df[df['date'].isin(pray_day_dates)]
+
+    if pray_day_bookings.empty:
+        return {
+            "repeaters_count": 0,
+            "summary_df": pd.DataFrame()
+        }
+
+    user_pray_day_counts = pray_day_bookings.groupby('person_key')['date'].nunique()
+    repeaters_count = (user_pray_day_counts > 1).sum()
+
+    summary_data = []
+
+    for p_date in pray_day_dates:
+        # Filter for this specific pray day
+        day_bookings = df[df['date'] == p_date]
+
+        # If no bookings for this configured day, show 0s
+        if day_bookings.empty:
+            summary_data.append({
+                "Date": p_date,
+                "Total Participants": 0,
+                ">1 Hour Participants": 0,
+                "Done Pray Day Before": 0,
+                "Done Regular Before": 0,
+                "New Users Retained": 0,
+                "Total New Users": 0,
+                "Total Hours": 0.0
+            })
+            continue
+
+        attendees = day_bookings['person_key'].unique()
+        total_participants = len(attendees)
+        total_hours = day_bookings['duration'].sum()
+
+        # Q2: >1 hour on single pray day
+        # Sum duration per user on this day
+        user_hours = day_bookings.groupby('person_key')['duration'].sum()
+        over_1h_count = (user_hours > 1).sum()
+
+        # Q3: Done a pray day before
+        # Find all previous pray days
+        prev_pray_days = [d for d in pray_day_dates if d < p_date]
+        if prev_pray_days:
+            # Users who booked on any previous pray day
+            prev_attendees = df[df['date'].isin(prev_pray_days)]['person_key'].unique()
+            done_pray_day_before = len(set(attendees).intersection(prev_attendees))
+        else:
+            done_pray_day_before = 0
+
+        # Q4: Done a regular hour before
+        # Regular hours are bookings on dates NOT in pray_day_dates and BEFORE p_date
+        regular_history_bookings = df[
+            (df['date'] < p_date) &
+            (~df['date'].isin(pray_day_dates))
+        ]
+        regular_history_users = regular_history_bookings['person_key'].unique()
+        done_regular_before = len(set(attendees).intersection(regular_history_users))
+
+        # Q5: First time on Pray Day -> Retained
+        # "How many people who sign up for the first time for a PRAY DAY then sign up for another hour afterwards?"
+
+        # Optimization: Pre-calculate first booking for all attendees on this day
+        # Filter global df for these users once
+        attendees_bookings = df[df['person_key'].isin(attendees)]
+
+        # Group by user to find first booking date
+        user_first_booking = attendees_bookings.groupby('person_key')['start_time'].min().dt.date
+
+        # Identify new users (whose first booking is exactly this p_date)
+        new_users_series = user_first_booking[user_first_booking == p_date]
+        new_users_on_this_day = new_users_series.index.tolist()
+
+        # Check retention: Do these new users have bookings > p_date?
+        # We can reuse attendees_bookings but we need to check if they have bookings > p_date
+        # Wait, attendees_bookings contains ALL bookings for these users.
+
+        retained_count = 0
+        if new_users_on_this_day:
+            # Filter bookings for just the new users
+            new_users_bookings = attendees_bookings[attendees_bookings['person_key'].isin(new_users_on_this_day)]
+
+            # Check for any booking date > p_date per user
+            users_with_future_bookings = new_users_bookings[new_users_bookings['date'] > p_date]['person_key'].unique()
+            retained_count = len(users_with_future_bookings)
+
+        summary_data.append({
+            "Date": p_date,
+            "Total Participants": total_participants,
+            ">1 Hour Participants": over_1h_count,
+            "Done Pray Day Before": done_pray_day_before,
+            "Done Regular Before": done_regular_before,
+            "New Users Retained": retained_count,
+            "Total New Users": len(new_users_on_this_day),
+            "Total Hours": total_hours
+        })
+
+    summary_df = pd.DataFrame(summary_data)
+
+    return {
+        "repeaters_count": repeaters_count,
+        "summary_df": summary_df
+    }
