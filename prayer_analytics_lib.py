@@ -616,8 +616,8 @@ def calculate_fortnightly_regulars_metrics(df, user_summary, outdir):
     # Calculate average duration per user per fortnight
     user_summary["avg_hours_per_fortnight"] = user_summary["total_hours"] / fortnight_count
 
-    # UPDATED: Define a fortnight regular as someone averaging > 1 hour per fortnight
-    fortnight_regulars_df = user_summary[user_summary["avg_hours_per_fortnight"] > 1]
+    # UPDATED: Define a fortnight regular as someone averaging >= 1 hour per fortnight
+    fortnight_regulars_df = user_summary[user_summary["avg_hours_per_fortnight"] >= 1]
     num_fortnight_regulars = len(fortnight_regulars_df)
 
     # Calculate hours contributed by fortnight regulars

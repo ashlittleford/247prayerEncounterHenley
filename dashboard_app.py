@@ -313,6 +313,39 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
     cols_reg[2].metric("Hours by Weekly Regulars (%)", metric_dict.get("Total Hours by Weekly Regulars (%)", "N/A"))
     cols_reg[3].metric("Total Sessions", total_sessions_count)
 
+    # --- Display lists of regulars ---
+
+    # 1. Weekly Regulars
+    with st.expander("Weekly Regulars Details", expanded=False):
+        if "weekly_avg_hours" in user_summary.columns:
+            # Filter for weekly regulars
+            weekly_df = user_summary[user_summary["weekly_avg_hours"] >= 1].copy()
+            if not weekly_df.empty:
+                 # Display Name and Weekly Avg
+                 display_df = weekly_df[["person_name", "weekly_avg_hours"]].sort_values("weekly_avg_hours", ascending=False)
+                 display_df.rename(columns={"person_name": "Name", "weekly_avg_hours": "Avg Hours/Week"}, inplace=True)
+                 st.dataframe(display_df, hide_index=True, use_container_width=True)
+            else:
+                 st.write("No weekly regulars found.")
+        else:
+             st.write("Data not available.")
+
+    # 2. Fortnightly Regulars
+    with st.expander("Fortnightly Regulars Details", expanded=False):
+        if "avg_hours_per_fortnight" in user_summary.columns:
+            # Filter for fortnightly regulars
+            fortnightly_df = user_summary[user_summary["avg_hours_per_fortnight"] > 1].copy()
+            if not fortnightly_df.empty:
+                 # Display Name and Weekly Avg (as requested "avg per week number")
+                 # We use weekly_avg_hours column for this.
+                 display_df = fortnightly_df[["person_name", "weekly_avg_hours"]].sort_values("weekly_avg_hours", ascending=False)
+                 display_df.rename(columns={"person_name": "Name", "weekly_avg_hours": "Avg Hours/Week"}, inplace=True)
+                 st.dataframe(display_df, hide_index=True, use_container_width=True)
+            else:
+                 st.write("No fortnightly regulars found.")
+        else:
+             st.write("Data not available.")
+
     st.markdown("---")
     
     # --- Time-Series & Distribution Charts ---
