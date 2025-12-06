@@ -313,6 +313,29 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
     cols_reg[2].metric("Hours by Weekly Regulars (%)", metric_dict.get("Total Hours by Weekly Regulars (%)", "N/A"))
     cols_reg[3].metric("Total Sessions", total_sessions_count)
 
+    # --- Display lists of regulars ---
+    weekly_regs = []
+    if "weekly_avg_hours" in user_summary.columns:
+         weekly_regs = sorted(user_summary[user_summary["weekly_avg_hours"] >= 1]["person_name"].unique())
+
+    fortnightly_regs = []
+    if "avg_hours_per_fortnight" in user_summary.columns:
+         fortnightly_regs = sorted(user_summary[user_summary["avg_hours_per_fortnight"] > 1]["person_name"].unique())
+
+    # Display Weekly Regulars under the metric
+    if weekly_regs:
+        with cols_reg[0]:
+            with st.expander("See Names", expanded=False):
+                for name in weekly_regs:
+                    st.caption(name)
+
+    # Display Fortnightly Regulars under the metric
+    if fortnightly_regs:
+        with cols_reg[1]:
+            with st.expander("See Names", expanded=False):
+                for name in fortnightly_regs:
+                    st.caption(name)
+
     st.markdown("---")
     
     # --- Time-Series & Distribution Charts ---
