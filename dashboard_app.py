@@ -14,6 +14,7 @@ import prayer_analytics_lib as pal
 # --- CONFIGURATION & SETUP ---
 LOGO_FILE = "logo.png"          
 CUSTOM_LOGO_WIDTH = 100         
+PRAY_DAYS_FILE = "pray_days.txt"
 
 # 1. Set page config FIRST
 st.set_page_config(layout="wide", page_title="Prayer Room Analytics Dashboard")
@@ -66,89 +67,6 @@ else:
 st.title("Prayer Room Analytics Dashboard")
 st.markdown(f"Welcome to the **Prayer Room Analytics Dashboard**! Customize the analysis below and press **Run Analysis**.")
 st.sidebar.markdown('---')
-
-
-# --- 1. Sidebar for User Inputs (Customization) ---
-
-st.sidebar.header("Data Management")
-
-# Display Last Updated Date
-if os.path.exists("current.csv"):
-    last_modified_timestamp = os.path.getmtime("current.csv")
-    last_modified_date = pd.to_datetime(last_modified_timestamp, unit='s').strftime('%Y-%m-%d %H:%M:%S')
-    st.sidebar.write(f"**current.csv** last updated:\n{last_modified_date}")
-else:
-    st.sidebar.warning("current.csv not found.")
-
-# File Uploader
-uploaded_file = st.sidebar.file_uploader("Upload new current.csv", type=['csv'])
-
-if uploaded_file is not None:
-    # Option to commit/replace
-    if st.sidebar.button("Replace current.csv with uploaded file"):
-        # Save the file
-        try:
-            with open("current.csv", "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            st.session_state['upload_success'] = True
-            # Trigger a rerun to update the date and potentially the analysis
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"Error saving file: {e}")
-
-if st.session_state.get('upload_success'):
-    st.sidebar.success("current.csv updated successfully!")
-    st.session_state['upload_success'] = False
-
-st.sidebar.markdown('---')
-
-st.sidebar.header("Configuration")
-
-# Customization 1: Include GWOP Data
-include_gwop = st.sidebar.checkbox("Include 'gwop.csv' data", value=True)
-
-# Customization 2: Date Filters
-st.sidebar.subheader("Date Range Filter")
-start_date = st.sidebar.date_input("Start Date (optional)", value=None)
-end_date = st.sidebar.date_input("End Date (optional)", value=None)
-
-# Customization 3: Goal Percentage
-st.sidebar.subheader("Chart Goal Line")
-goal_percentage = st.sidebar.slider(
-    "Goal Percentage for Charts (0-100%)",
-    min_value=0,
-    max_value=100,
-    value=10,
-    step=5
-)
-if goal_percentage == 0:
-    goal_percentage = None 
-
-# Customization 4: Pray Day Dates
-st.sidebar.subheader("Pray Day Configuration")
-# Removed pre-filled default dates as per user request to avoid confusion.
-pray_days_input = st.sidebar.text_area(
-    "Pray Day Dates (YYYY-MM-DD)",
-    placeholder="2025-02-22\n2025-05-24\n2025-12-06",
-    height=100,
-    help="Enter each Pray Day date on a new line (YYYY-MM-DD)."
-)
-
-# Parse Pray Days
-pray_day_dates = []
-if pray_days_input:
-    for line in pray_days_input.split('\n'):
-        line = line.strip()
-        if line:
-            try:
-                # Flexible date parsing
-                dt = pd.to_datetime(line).date()
-                pray_day_dates.append(dt)
-            except:
-                pass # Ignore invalid lines
-
-# Define a temporary in-memory output directory (required by the lib functions)
-OUTPUT_DIR = "temp_dashboard_out" 
 
 
 # --- Helper functions to run the library and display results ---
@@ -524,6 +442,116 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
         file_name='user_summary_export.csv',
         mime='text/csv',
     )
+
+
+# --- 1. Sidebar for User Inputs (Customization) ---
+
+st.sidebar.header("Data Management")
+
+# Display Last Updated Date
+if os.path.exists("current.csv"):
+    last_modified_timestamp = os.path.getmtime("current.csv")
+    last_modified_date = pd.to_datetime(last_modified_timestamp, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+    st.sidebar.write(f"**current.csv** last updated:\n{last_modified_date}")
+else:
+    st.sidebar.warning("current.csv not found.")
+
+# File Uploader
+uploaded_file = st.sidebar.file_uploader("Upload new current.csv", type=['csv'])
+
+if uploaded_file is not None:
+    # Option to commit/replace
+    if st.sidebar.button("Replace current.csv with uploaded file"):
+        # Save the file
+        try:
+            with open("current.csv", "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.session_state['upload_success'] = True
+            # Trigger a rerun to update the date and potentially the analysis
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"Error saving file: {e}")
+
+if st.session_state.get('upload_success'):
+    st.sidebar.success("current.csv updated successfully!")
+    st.session_state['upload_success'] = False
+
+st.sidebar.markdown('---')
+
+st.sidebar.header("Configuration")
+
+# Customization 1: Include GWOP Data
+include_gwop = st.sidebar.checkbox("Include 'gwop.csv' data", value=True)
+
+# Customization 2: Date Filters
+st.sidebar.subheader("Date Range Filter")
+start_date = st.sidebar.date_input("Start Date (optional)", value=None)
+end_date = st.sidebar.date_input("End Date (optional)", value=None)
+
+# Customization 3: Goal Percentage
+st.sidebar.subheader("Chart Goal Line")
+goal_percentage = st.sidebar.slider(
+    "Goal Percentage for Charts (0-100%)",
+    min_value=0,
+    max_value=100,
+    value=10,
+    step=5
+)
+if goal_percentage == 0:
+    goal_percentage = None
+
+# Customization 4: Pray Day Dates (Persisted)
+st.sidebar.subheader("Pray Day Configuration")
+
+# Logic to load/save
+def load_pray_days():
+    if os.path.exists(PRAY_DAYS_FILE):
+        with open(PRAY_DAYS_FILE, "r") as f:
+            return f.read()
+    return ""
+
+def save_pray_days(text):
+    with open(PRAY_DAYS_FILE, "w") as f:
+        f.write(text)
+
+# Initialize session state if not set
+if 'pray_days_input' not in st.session_state:
+    st.session_state['pray_days_input'] = load_pray_days()
+
+# Callback to save changes
+def on_pray_days_change():
+    save_pray_days(st.session_state['pray_days_input_widget'])
+    st.session_state['pray_days_input'] = st.session_state['pray_days_input_widget']
+
+pray_days_input = st.sidebar.text_area(
+    "Pray Day Dates",
+    value=st.session_state['pray_days_input'],
+    height=100,
+    help="Enter each Pray Day date on a new line. Supports YYYY-MM-DD and DD-MM-YYYY.",
+    key='pray_days_input_widget',
+    on_change=on_pray_days_change
+)
+
+# Parse Pray Days
+pray_day_dates = []
+if pray_days_input:
+    for line in pray_days_input.split('\n'):
+        line = line.strip()
+        if line:
+            # Enhanced parsing for DD-MM-YYYY
+            try:
+                # First try pandas default (handles YYYY-MM-DD well)
+                # Then try dayfirst=True for DD-MM-YYYY
+                try:
+                    dt = pd.to_datetime(line, dayfirst=False).date()
+                except:
+                    dt = pd.to_datetime(line, dayfirst=True).date()
+                pray_day_dates.append(dt)
+            except:
+                pass # Ignore invalid lines
+
+# Define a temporary in-memory output directory (required by the lib functions)
+OUTPUT_DIR = "temp_dashboard_out"
 
 
 # --- 3. Main execution block with a Run button ---
