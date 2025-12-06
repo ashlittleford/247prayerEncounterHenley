@@ -102,12 +102,9 @@ def format_change_metric(change_pct):
     """
     Ensures Green is positive, Red is negative for Streamlit's delta metrics.
     """
-    if change_pct > 0:
+    if change_pct != 0:
         delta = f"{change_pct:.1f}%"
-        delta_color = "inverse" 
-    elif change_pct < 0:
-        delta = f"{abs(change_pct):.1f}%"
-        delta_color = "normal"  
+        delta_color = "normal"
     else:
         delta = "No Change"
         delta_color = "off"
