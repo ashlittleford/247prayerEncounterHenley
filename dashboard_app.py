@@ -314,27 +314,37 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
     cols_reg[3].metric("Total Sessions", total_sessions_count)
 
     # --- Display lists of regulars ---
-    weekly_regs = []
-    if "weekly_avg_hours" in user_summary.columns:
-         weekly_regs = sorted(user_summary[user_summary["weekly_avg_hours"] >= 1]["person_name"].unique())
 
-    fortnightly_regs = []
-    if "avg_hours_per_fortnight" in user_summary.columns:
-         fortnightly_regs = sorted(user_summary[user_summary["avg_hours_per_fortnight"] > 1]["person_name"].unique())
+    # 1. Weekly Regulars
+    with st.expander("Weekly Regulars Details", expanded=False):
+        if "weekly_avg_hours" in user_summary.columns:
+            # Filter for weekly regulars
+            weekly_df = user_summary[user_summary["weekly_avg_hours"] >= 1].copy()
+            if not weekly_df.empty:
+                 # Display Name and Weekly Avg
+                 display_df = weekly_df[["person_name", "weekly_avg_hours"]].sort_values("weekly_avg_hours", ascending=False)
+                 display_df.rename(columns={"person_name": "Name", "weekly_avg_hours": "Avg Hours/Week"}, inplace=True)
+                 st.dataframe(display_df, hide_index=True, use_container_width=True)
+            else:
+                 st.write("No weekly regulars found.")
+        else:
+             st.write("Data not available.")
 
-    # Display Weekly Regulars under the metric
-    if weekly_regs:
-        with cols_reg[0]:
-            with st.expander("See Names", expanded=False):
-                for name in weekly_regs:
-                    st.caption(name)
-
-    # Display Fortnightly Regulars under the metric
-    if fortnightly_regs:
-        with cols_reg[1]:
-            with st.expander("See Names", expanded=False):
-                for name in fortnightly_regs:
-                    st.caption(name)
+    # 2. Fortnightly Regulars
+    with st.expander("Fortnightly Regulars Details", expanded=False):
+        if "avg_hours_per_fortnight" in user_summary.columns:
+            # Filter for fortnightly regulars
+            fortnightly_df = user_summary[user_summary["avg_hours_per_fortnight"] > 1].copy()
+            if not fortnightly_df.empty:
+                 # Display Name and Weekly Avg (as requested "avg per week number")
+                 # We use weekly_avg_hours column for this.
+                 display_df = fortnightly_df[["person_name", "weekly_avg_hours"]].sort_values("weekly_avg_hours", ascending=False)
+                 display_df.rename(columns={"person_name": "Name", "weekly_avg_hours": "Avg Hours/Week"}, inplace=True)
+                 st.dataframe(display_df, hide_index=True, use_container_width=True)
+            else:
+                 st.write("No fortnightly regulars found.")
+        else:
+             st.write("Data not available.")
 
     st.markdown("---")
     
