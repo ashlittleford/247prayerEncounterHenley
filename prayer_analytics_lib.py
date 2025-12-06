@@ -1,10 +1,26 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import os
 from datetime import timedelta
 import matplotlib.dates as mdates
 import sys
+
+# -----------------------
+# Font Setup for Matplotlib
+# -----------------------
+# Register fonts
+font_path_regular = os.path.join("fonts", "Montserrat-Regular.ttf")
+font_path_bold = os.path.join("fonts", "Montserrat-Bold.ttf")
+
+if os.path.exists(font_path_regular):
+    fm.fontManager.addfont(font_path_regular)
+if os.path.exists(font_path_bold):
+    fm.fontManager.addfont(font_path_bold)
+
+plt.rcParams['font.family'] = 'Montserrat'
+
 
 # -----------------------
 # Core Functions
