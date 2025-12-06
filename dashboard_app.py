@@ -71,6 +71,12 @@ st.sidebar.markdown('---')
 
 # --- Helper functions to run the library and display results ---
 
+def format_date_custom(d):
+    """Formats date as '24th May 25'."""
+    day = d.day
+    suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix} {d.strftime('%B %y')}"
+
 def display_pray_day_results(df, pray_day_dates):
     """
     Computes and displays Pray Days analytics.
@@ -84,18 +90,43 @@ def display_pray_day_results(df, pray_day_dates):
 
     st.header("Pray Days Analysis")
 
-    # Global Metric
-    st.metric("Total Repeaters (Attended > 1 Pray Day)", results["repeaters_count"])
+    # Extract Metrics
+    total_participants = results.get("total_unique_participants", 0)
+    total_repeaters = results.get("repeaters_count", 0)
+
+    summary_df = results["summary_df"]
+
+    # Calculate Latest Pray Day Newbies Total
+    latest_newbies = 0
+    if not summary_df.empty:
+        # Sort by Date to find the latest
+        summary_df["Date"] = pd.to_datetime(summary_df["Date"])
+        latest_row = summary_df.sort_values("Date").iloc[-1]
+        latest_newbies = latest_row["Total New Users"]
+
+    # Display Top Metrics in requested order
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Individual Pray Day Participants", total_participants)
+    c2.metric("Total Repeaters", total_repeaters)
+    c3.metric("Latest Pray Day Newbies Total", latest_newbies)
 
     st.subheader("Per Pray Day Breakdown")
-    summary_df = results["summary_df"]
 
     if summary_df.empty:
         st.write("No bookings found for the specified Pray Days.")
     else:
-        # Format dates for better display
-        summary_df["Date"] = pd.to_datetime(summary_df["Date"]).dt.strftime('%Y-%m-%d')
-        st.dataframe(summary_df, use_container_width=True)
+        # Transpose Logic
+        # 1. Set Date as Index
+        display_df = summary_df.set_index("Date").copy()
+
+        # 2. Transpose
+        display_df = display_df.T
+
+        # 3. Format Columns (Dates)
+        new_columns = [format_date_custom(pd.to_datetime(c)) for c in display_df.columns]
+        display_df.columns = new_columns
+
+        st.dataframe(display_df, use_container_width=True)
 
         st.markdown("""
         **Metric Explanations:**

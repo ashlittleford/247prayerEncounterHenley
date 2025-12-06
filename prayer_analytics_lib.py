@@ -700,6 +700,7 @@ def analyze_pray_days(df, pray_day_dates):
 
     user_pray_day_counts = pray_day_bookings.groupby('person_key')['date'].nunique()
     repeaters_count = (user_pray_day_counts > 1).sum()
+    total_unique_participants = pray_day_bookings['person_key'].nunique()
 
     summary_data = []
 
@@ -791,5 +792,6 @@ def analyze_pray_days(df, pray_day_dates):
 
     return {
         "repeaters_count": repeaters_count,
+        "total_unique_participants": total_unique_participants,
         "summary_df": summary_df
     }
