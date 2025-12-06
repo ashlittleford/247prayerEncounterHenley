@@ -469,6 +469,9 @@ if st.sidebar.button("Run Analysis"):
         
             st.success(f"Analysis complete for **{len(df)}** bookings from **{df['start_time'].min().strftime('%Y-%m-%d')}** to **{df['start_time'].max().strftime('%Y-%m-%d')}**.")
             
+            # Ensure OUTPUT_DIR exists (it might not if run_full_analysis was cached)
+            os.makedirs(OUTPUT_DIR, exist_ok=True)
+
             # Updated call to pass total_sessions_count
             display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, goal_percentage, OUTPUT_DIR, total_sessions_count)
             
