@@ -748,8 +748,11 @@ with tab_admin:
             if lbl:
                 display_str += f" - {lbl}"
 
-            pills_options.append(display_str)
-            pills_map[display_str] = d_str
+            # Add visual "X" to indicate deletability
+            display_str_with_x = f"{display_str}  ✕"
+
+            pills_options.append(display_str_with_x)
+            pills_map[display_str_with_x] = d_str
 
         st.caption("Tap a day to remove it from the list.")
 
@@ -782,51 +785,6 @@ with tab_admin:
                 st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != removed_date_str]
                 save_pray_days_config(st.session_state['pray_days_list'])
                 st.rerun()
-        # Create a grid of columns to display the bubbles next to each other
-        # 4 columns ensures they are narrow and dynamic
-        grid_cols = st.columns(4)
-
-        for i, item in enumerate(sorted_days):
-            with grid_cols[i % 4]:
-                d_str = item['date']
-                lbl = item['label']
-
-                # Format date for display
-                d_obj = pd.to_datetime(d_str).date()
-                display_str = d_obj.strftime("%d %b %Y")
-                if lbl:
-                    # Escape label for security
-                    safe_lbl = html.escape(lbl)
-                    display_str += f" - <strong>{safe_lbl}</strong>"
-
-                # Nested columns for the bubble and the X button
-                # Adjust ratios for the narrower column width
-                col_text, col_x = st.columns([0.8, 0.2], vertical_alignment="center")
-
-                with col_text:
-                     # Use site accent color #7A8AB2
-                     st.markdown(f"""
-                     <div style="
-                        background-color: #f0f2f6;
-                        border-left: 5px solid #7A8AB2;
-                        padding: 10px 10px;
-                        border-radius: 5px;
-                        font-size: 0.85em;
-                        margin-bottom: 5px;
-                        color: black;
-                        display: flex;
-                        align-items: center;
-                        height: 100%;
-                     ">
-                        {display_str}
-                     </div>
-                     """, unsafe_allow_html=True)
-
-                with col_x:
-                    if st.button("✕", key=f"del_{d_str}", help="Remove"):
-                        st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != d_str]
-                        save_pray_days_config(st.session_state['pray_days_list'])
-                        st.rerun()
     else:
         st.info("No Pray Days configured.")
 
