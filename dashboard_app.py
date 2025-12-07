@@ -78,7 +78,7 @@ def format_date_custom(d):
     suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
     return f"{day}{suffix} {d.strftime('%B %y')}"
 
-def display_pray_day_results(df, pray_day_dates):
+def display_pray_day_results(df, pray_day_dates, full_history_df=None):
     """
     Computes and displays Pray Days analytics.
     """
@@ -87,7 +87,7 @@ def display_pray_day_results(df, pray_day_dates):
         return
 
     # Call the library function
-    results = pal.analyze_pray_days(df, pray_day_dates)
+    results = pal.analyze_pray_days(df, pray_day_dates, full_history_df=full_history_df)
 
     st.header("Pray Days Analysis")
 
@@ -598,6 +598,9 @@ pray_days_input = st.sidebar.text_area(
     on_change=on_pray_days_change
 )
 
+# Option to exclude GWOP from New User calculation
+exclude_gwop_newness = st.sidebar.checkbox("Exclude GWOP from 'New to Pray Day' Logic", value=True)
+
 # Parse Pray Days
 pray_day_dates = []
 if pray_days_input:
@@ -698,8 +701,10 @@ if st.sidebar.button("Run Analysis"):
                 display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, goal_percentage, OUTPUT_DIR, total_sessions_count)
             
             with tab_praydays:
-                # Use df_pray_days_base so Pray Day analytics excludes GWOP history
-                display_pray_day_results(df_pray_days_base, pray_day_dates)
+                # Use df_pray_days_base if exclusion is requested, otherwise use df_unfiltered
+                # Always pass df_unfiltered as full_history_df for Total Hours calculation
+                df_for_status = df_pray_days_base if exclude_gwop_newness else df_unfiltered
+                display_pray_day_results(df_for_status, pray_day_dates, full_history_df=df_unfiltered)
 
             # Clean up the temporary directory after display
             if os.path.exists(OUTPUT_DIR):

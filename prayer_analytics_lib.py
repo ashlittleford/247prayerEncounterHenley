@@ -683,13 +683,15 @@ def calculate_average_metrics(df):
             "Value": f"{avg_hours_per_month:.1f}"
         },
     ]
-def analyze_pray_days(df, pray_day_dates):
+def analyze_pray_days(df, pray_day_dates, full_history_df=None):
     """
     Analyzes data specifically for Pray Days.
 
     Args:
-        df: The main dataframe with 'start_time', 'end_time', 'person_key', 'duration'.
+        df: The dataframe to use for identification (New/Old status, Repeaters, etc.).
         pray_day_dates: A list of datetime.date objects representing the Pray Days.
+        full_history_df: Optional. A dataframe containing the complete history (including GWOP etc)
+                         to calculate "Total Hours Ever" for new users. If None, uses 'df'.
 
     Returns:
         A dictionary containing:
@@ -699,11 +701,15 @@ def analyze_pray_days(df, pray_day_dates):
     # Create a copy to avoid SettingWithCopy warnings on the original df
     df = df.copy()
 
+    # Determine which DF to use for calculating Total Hours Ever
+    history_source_df = full_history_df.copy() if full_history_df is not None else df.copy()
+
     # Ensure pray_day_dates are sorted unique dates
     pray_day_dates = sorted(list(set(pray_day_dates)))
 
     # Add date column for easy filtering
     df['date'] = df['start_time'].dt.date
+    # Ensure history source also has key columns if needed, though we mainly need person_key and duration
 
     # 1. Global Metric: Repeaters (Users who attended > 1 Pray Day)
     pray_day_bookings = df[df['date'].isin(pray_day_dates)]
@@ -808,10 +814,15 @@ def analyze_pray_days(df, pray_day_dates):
             retained_count = len(users_with_future_bookings)
 
             # Calculate details for new users (Name and Total Hours)
+            # Use history_source_df for the Total Hours Calculation
+            history_of_new_users = history_source_df[history_source_df['person_key'].isin(new_users_on_this_day)]
+
             # 1. Group by person_key to sum duration
-            grouped = new_users_bookings.groupby("person_key")["duration"].sum().reset_index(name="Total Hours")
+            grouped = history_of_new_users.groupby("person_key")["duration"].sum().reset_index(name="Total Hours")
 
             # 2. Get names. Drop duplicates on person_key to get names
+            # Use current df for names to ensure consistency with current analysis context?
+            # Or history? Names should be same. Use new_users_bookings (from df) for names.
             names_df = new_users_bookings[["person_key", "person_name"]].drop_duplicates("person_key")
 
             # 3. Merge
