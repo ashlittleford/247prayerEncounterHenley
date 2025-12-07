@@ -719,6 +719,7 @@ def analyze_pray_days(df, pray_day_dates):
     total_unique_participants = pray_day_bookings['person_key'].nunique()
 
     summary_data = []
+    newbies_details_map = {}
 
     for p_date in pray_day_dates:
         # Filter for this specific pray day
@@ -736,6 +737,7 @@ def analyze_pray_days(df, pray_day_dates):
                 "Total New Users": 0,
                 "Total Hours": 0.0
             })
+            newbies_details_map[p_date] = pd.DataFrame(columns=["Name", "Total Hours"])
             continue
 
         attendees = day_bookings['person_key'].unique()
@@ -785,6 +787,8 @@ def analyze_pray_days(df, pray_day_dates):
         # Wait, attendees_bookings contains ALL bookings for these users.
 
         retained_count = 0
+        details_df = pd.DataFrame(columns=["Name", "Total Hours"])
+
         if new_users_on_this_day:
             # Filter bookings for just the new users
             new_users_bookings = attendees_bookings[attendees_bookings['person_key'].isin(new_users_on_this_day)]
@@ -792,6 +796,23 @@ def analyze_pray_days(df, pray_day_dates):
             # Check for any booking date > p_date per user
             users_with_future_bookings = new_users_bookings[new_users_bookings['date'] > p_date]['person_key'].unique()
             retained_count = len(users_with_future_bookings)
+
+            # Calculate details for new users (Name and Total Hours)
+            # 1. Group by person_key to sum duration
+            grouped = new_users_bookings.groupby("person_key")["duration"].sum().reset_index(name="Total Hours")
+
+            # 2. Get names. Drop duplicates on person_key to get names
+            names_df = new_users_bookings[["person_key", "person_name"]].drop_duplicates("person_key")
+
+            # 3. Merge
+            details_df = grouped.merge(names_df, on="person_key")
+
+            # 4. Format
+            details_df = details_df[["person_name", "Total Hours"]].rename(columns={"person_name": "Name"})
+            details_df["Total Hours"] = details_df["Total Hours"].round(2)
+            details_df = details_df.sort_values("Total Hours", ascending=False)
+
+        newbies_details_map[p_date] = details_df
 
         summary_data.append({
             "Date": p_date,
@@ -809,5 +830,6 @@ def analyze_pray_days(df, pray_day_dates):
     return {
         "repeaters_count": repeaters_count,
         "total_unique_participants": total_unique_participants,
-        "summary_df": summary_df
+        "summary_df": summary_df,
+        "newbies_details": newbies_details_map
     }
