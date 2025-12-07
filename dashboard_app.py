@@ -164,8 +164,10 @@ def format_change_metric(change_pct):
 
 @st.cache_data(show_spinner=False)
 def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage, config_timestamps=None):
+def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage, cache_key=None):
     """
     Executes the analysis logic from prayer_analytics_lib.py.
+    cache_key is used to force re-computation when config files change.
     """
     
     # ----------------------------------------------------
@@ -206,6 +208,26 @@ def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percen
     if merge_map:
         df_unfiltered["person_key"] = df_unfiltered["person_key"].replace(merge_map)
 
+    # Apply keys
+    df_unfiltered["person_key"] = df_unfiltered.apply(pal.make_person_key, axis=1, args=(email_map,))
+
+    # Apply Key Merges (Overrides)
+    person_merges_path = "person_merges.csv"
+    if os.path.exists(person_merges_path):
+        try:
+            merges_df = pd.read_csv(person_merges_path)
+            # Create a dictionary for mapping source_key -> target_key
+            merge_map = {}
+            for _, row in merges_df.iterrows():
+                if pd.notna(row['source_key']) and pd.notna(row['target_key']):
+                    merge_map[row['source_key'].strip()] = row['target_key'].strip()
+
+            if merge_map:
+                df_unfiltered["person_key"] = df_unfiltered["person_key"].replace(merge_map)
+        except Exception as e:
+            st.warning(f"Error loading person_merges.csv: {e}")
+
+    # Calculate hours on the UNFILTERED data
     df_unfiltered["person_name"] = df_unfiltered.apply(
         lambda r: "UNKNOWN"
         if r["person_key"] == "UNKNOWN"
@@ -652,6 +674,14 @@ if st.sidebar.button("Run Analysis"):
                 for f in ["email_duplicates.csv", "person_merges.csv"]:
                     if os.path.exists(f):
                         config_timestamps[f] = os.path.getmtime(f)
+                # Generate a cache key based on modification times of config files
+                # This ensures that if the user updates email_duplicates or person_merges, the cache is invalidated.
+                config_files = ["email_duplicates.csv", "person_merges.csv"]
+                cache_key_parts = []
+                for cf in config_files:
+                    if os.path.exists(cf):
+                        cache_key_parts.append(f"{cf}:{os.path.getmtime(cf)}")
+                cache_key_str = "|".join(cache_key_parts)
 
                 # Updated call to retrieve total_sessions_count and df_unfiltered
                 df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count, df_unfiltered = run_full_analysis(
@@ -661,6 +691,7 @@ if st.sidebar.button("Run Analysis"):
                     end_date, 
                     goal_percentage,
                     config_timestamps
+                    cache_key=cache_key_str
                 )
         
             st.success(f"Analysis complete for **{len(df)}** bookings from **{df['start_time'].min().strftime('%Y-%m-%d')}** to **{df['start_time'].max().strftime('%Y-%m-%d')}**.")
