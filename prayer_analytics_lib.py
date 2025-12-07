@@ -845,10 +845,41 @@ def analyze_pray_days(df, pray_day_dates, full_history_df=None):
 
         for metric, keys in metrics_keys.items():
             for key in keys:
+                evidence = ""
+                # Find evidence for specific metrics to help user understand "Why?"
+                if metric == "Done Regular Before":
+                    # Find last regular booking
+                    # Regular bookings: Before p_date AND NOT in pray_day_dates
+                    reg_bookings = df[
+                        (df['person_key'] == key) &
+                        (df['date'] < p_date) &
+                        (~df['date'].isin(pray_day_dates))
+                    ]
+                    if not reg_bookings.empty:
+                        last_reg = reg_bookings['date'].max()
+                        evidence = f"Prior Regular: {last_reg.strftime('%d/%m/%Y')}"
+
+                elif metric == "Done Pray Day Before":
+                    # Find last pray day booking
+                    # Pray Day bookings: Before p_date AND in pray_day_dates
+                    pd_bookings = df[
+                        (df['person_key'] == key) &
+                        (df['date'] < p_date) &
+                        (df['date'].isin(pray_day_dates))
+                    ]
+                    if not pd_bookings.empty:
+                        last_pd = pd_bookings['date'].max()
+                        evidence = f"Prior Pray Day: {last_pd.strftime('%d/%m/%Y')}"
+
+                elif metric == "New Users" or metric == "Total New Users":
+                    # First booking is p_date
+                    evidence = f"First Booking: {p_date.strftime('%d/%m/%Y')}"
+
                 detailed_export_data.append({
                     "Date": p_date,
                     "Metric": metric,
-                    "Name": key_to_name.get(key, "Unknown")
+                    "Name": key_to_name.get(key, "Unknown"),
+                    "Evidence": evidence
                 })
 
         newbies_details_map[p_date] = details_df
