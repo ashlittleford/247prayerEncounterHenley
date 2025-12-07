@@ -255,8 +255,8 @@ def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percen
     # Manually calculate Total Sessions
     total_sessions_count = len(df)
     
-    # Return dataframes needed for display
-    return df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count
+    # Return dataframes needed for display (including df_unfiltered for Pray Day analysis)
+    return df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count, df_unfiltered
 
 # ------------------------------------------------------------------------------------------------------------------
 # Display Logic
@@ -525,7 +525,9 @@ include_gwop = st.sidebar.checkbox("Include 'gwop.csv' data", value=True)
 
 # Customization 2: Date Filters
 st.sidebar.subheader("Date Range Filter")
-start_date = st.sidebar.date_input("Start Date (optional)", value=None)
+# Default start date hardcoded to Jan 5th 2025 as requested
+default_start = pd.Timestamp("2025-01-05").date()
+start_date = st.sidebar.date_input("Start Date (optional)", value=default_start)
 end_date = st.sidebar.date_input("End Date (optional)", value=None)
 
 # Customization 3: Goal Percentage
@@ -599,13 +601,16 @@ OUTPUT_DIR = "temp_dashboard_out"
 if st.sidebar.button("Run Analysis"):
     # ... (File checking and analysis logic remains the same) ...
     # Define input files
-    base_input_files = ["initial.csv", "current.csv"]
+    base_input_files = ["initial.csv", "current.csv", "prayday1.csv", "prayday2.csv", "prayday3.csv", "prayday4.csv"]
     input_files = base_input_files + ["gwop.csv"] if include_gwop else base_input_files
     
     # Check if files exist
-    missing_files = [f for f in input_files if not os.path.exists(f)]
-    if missing_files:
-        st.error(f"Cannot run analysis. Missing input files: {', '.join(missing_files)}. Please upload them to the directory.")
+    # Filter only existing files to avoid crashing if one is missing,
+    # but ensure we have at least something to run.
+    input_files = [f for f in input_files if os.path.exists(f)]
+
+    if not input_files:
+        st.error(f"Cannot run analysis. No valid input files found (checked initial.csv, current.csv, gwop.csv, prayday[1-4].csv).")
     else:
         try:
             # Clean up the temporary directory before running
@@ -615,8 +620,8 @@ if st.sidebar.button("Run Analysis"):
                 os.rmdir(OUTPUT_DIR)
             
             with st.spinner("Running complex analysis..."):
-                # Updated call to retrieve total_sessions_count
-                df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count = run_full_analysis(
+                # Updated call to retrieve total_sessions_count and df_unfiltered
+                df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count, df_unfiltered = run_full_analysis(
                     input_files, 
                     OUTPUT_DIR, 
                     start_date, 
@@ -637,7 +642,9 @@ if st.sidebar.button("Run Analysis"):
                 display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, goal_percentage, OUTPUT_DIR, total_sessions_count)
             
             with tab_praydays:
-                display_pray_day_results(df, pray_day_dates)
+                # Use df_unfiltered so Pray Day analytics can see the full history
+                # (including the newly added historical CSVs)
+                display_pray_day_results(df_unfiltered, pray_day_dates)
 
             # Clean up the temporary directory after display
             if os.path.exists(OUTPUT_DIR):
