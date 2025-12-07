@@ -506,7 +506,8 @@ st.sidebar.header("Data Management")
 # Display Last Updated Date
 if os.path.exists("current.csv"):
     last_modified_timestamp = os.path.getmtime("current.csv")
-    last_modified_date = pd.to_datetime(last_modified_timestamp, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+    # Convert to UTC-aware datetime, then to Adelaide time
+    last_modified_date = pd.to_datetime(last_modified_timestamp, unit='s', utc=True).tz_convert('Australia/Adelaide').strftime('%Y-%m-%d %H:%M:%S')
     st.sidebar.write(f"**current.csv** last updated:\n{last_modified_date}")
 else:
     st.sidebar.warning("current.csv not found.")
