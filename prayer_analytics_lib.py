@@ -718,7 +718,12 @@ def analyze_pray_days(df, pray_day_dates):
     repeaters_count = (user_pray_day_counts > 1).sum()
     total_unique_participants = pray_day_bookings['person_key'].nunique()
 
+    # Map person_key to person_name efficiently
+    # Use mode to find the most common name usage, fallback to first
+    key_to_name = df.groupby('person_key')['person_name'].apply(lambda x: x.mode()[0] if not x.mode().empty else x.iloc[0]).to_dict()
+
     summary_data = []
+    detailed_export_data = []
     newbies_details_map = {}
 
     for p_date in pray_day_dates:
@@ -747,7 +752,8 @@ def analyze_pray_days(df, pray_day_dates):
         # Q2: >1 hour on single pray day
         # Sum duration per user on this day
         user_hours = day_bookings.groupby('person_key')['duration'].sum()
-        over_1h_count = (user_hours > 1).sum()
+        over_1h_users = user_hours[user_hours > 1].index.tolist()
+        over_1h_count = len(over_1h_users)
 
         # Q3: Done a pray day before
         # Find all previous pray days
@@ -755,9 +761,11 @@ def analyze_pray_days(df, pray_day_dates):
         if prev_pray_days:
             # Users who booked on any previous pray day
             prev_attendees = df[df['date'].isin(prev_pray_days)]['person_key'].unique()
-            done_pray_day_before = len(set(attendees).intersection(prev_attendees))
+            done_pray_day_before_keys = set(attendees).intersection(prev_attendees)
+            done_pray_day_before = len(done_pray_day_before_keys)
         else:
             done_pray_day_before = 0
+            done_pray_day_before_keys = set()
 
         # Q4: Done a regular hour before
         # Regular hours are bookings on dates NOT in pray_day_dates and BEFORE p_date
@@ -766,7 +774,8 @@ def analyze_pray_days(df, pray_day_dates):
             (~df['date'].isin(pray_day_dates))
         ]
         regular_history_users = regular_history_bookings['person_key'].unique()
-        done_regular_before = len(set(attendees).intersection(regular_history_users))
+        done_regular_before_keys = set(attendees).intersection(regular_history_users)
+        done_regular_before = len(done_regular_before_keys)
 
         # Q5: First time on Pray Day -> Retained
         # "How many people who sign up for the first time for a PRAY DAY then sign up for another hour afterwards?"
@@ -787,6 +796,7 @@ def analyze_pray_days(df, pray_day_dates):
         # Wait, attendees_bookings contains ALL bookings for these users.
 
         retained_count = 0
+        users_with_future_bookings = []
         details_df = pd.DataFrame(columns=["Name", "Total Hours"])
 
         if new_users_on_this_day:
@@ -794,7 +804,7 @@ def analyze_pray_days(df, pray_day_dates):
             new_users_bookings = attendees_bookings[attendees_bookings['person_key'].isin(new_users_on_this_day)]
 
             # Check for any booking date > p_date per user
-            users_with_future_bookings = new_users_bookings[new_users_bookings['date'] > p_date]['person_key'].unique()
+            users_with_future_bookings = new_users_bookings[new_users_bookings['date'] > p_date]['person_key'].unique().tolist()
             retained_count = len(users_with_future_bookings)
 
             # Calculate details for new users (Name and Total Hours)
@@ -812,6 +822,24 @@ def analyze_pray_days(df, pray_day_dates):
             details_df["Total Hours"] = details_df["Total Hours"].round(2)
             details_df = details_df.sort_values("Total Hours", ascending=False)
 
+        # Collect detailed breakdown
+        metrics_keys = {
+            "Total Participants": attendees,
+            ">1 Hour Participants": over_1h_users,
+            "Done Pray Day Before": done_pray_day_before_keys,
+            "Done Regular Before": done_regular_before_keys,
+            "New Users Retained": users_with_future_bookings,
+            "Total New Users": new_users_on_this_day
+        }
+
+        for metric, keys in metrics_keys.items():
+            for key in keys:
+                detailed_export_data.append({
+                    "Date": p_date,
+                    "Metric": metric,
+                    "Name": key_to_name.get(key, "Unknown")
+                })
+
         newbies_details_map[p_date] = details_df
 
         summary_data.append({
@@ -826,10 +854,12 @@ def analyze_pray_days(df, pray_day_dates):
         })
 
     summary_df = pd.DataFrame(summary_data)
+    breakdown_details_df = pd.DataFrame(detailed_export_data)
 
     return {
         "repeaters_count": repeaters_count,
         "total_unique_participants": total_unique_participants,
         "summary_df": summary_df,
-        "newbies_details": newbies_details_map
+        "newbies_details": newbies_details_map,
+        "breakdown_details_df": breakdown_details_df
     }
