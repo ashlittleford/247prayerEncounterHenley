@@ -651,6 +651,38 @@ if st.sidebar.button("Run Analysis"):
                     end_date, 
                     goal_percentage
                 )
+
+            # Create a dedicated DF for Pray Day analysis that strictly EXCLUDES gwop.csv to ensure "New Users" logic is correct
+            # even if 'Include GWOP' is ticked for general analytics.
+            # 1. Identify valid base files
+            valid_base_files = [f for f in base_input_files if os.path.exists(f)]
+
+            # 2. Load them
+            if valid_base_files:
+                # Load duplicates map again (quick enough) or reuse if I could refactor, but loading is safer.
+                email_dupes_path = "email_duplicates.csv"
+                email_map_pd = {}
+                if os.path.exists(email_dupes_path):
+                    email_dupes_df_pd = pd.read_csv(email_dupes_path)
+                    for _, row in email_dupes_df_pd.iterrows():
+                        p = str(row["primary"] or "").strip().lower()
+                        a = str(row["additional"] or "").strip().lower()
+                        if p and a:
+                            email_map_pd[a] = p
+
+                df_pray_days_base = pal.load_and_combine_csvs(valid_base_files)
+                df_pray_days_base = pal.normalize_columns(df_pray_days_base)
+                df_pray_days_base["person_key"] = df_pray_days_base.apply(pal.make_person_key, axis=1, args=(email_map_pd,))
+                df_pray_days_base["person_name"] = df_pray_days_base.apply(
+                    lambda r: "UNKNOWN"
+                    if r["person_key"] == "UNKNOWN"
+                    else f"{str(r['firstname'] or '').strip()} {str(r['lastname'] or '').strip()}".strip(),
+                    axis=1,
+                )
+                df_pray_days_base = pal.calculate_hours(df_pray_days_base)
+            else:
+                df_pray_days_base = pd.DataFrame() # Fallback
+
         
             st.success(f"Analysis complete for **{len(df)}** bookings from **{df['start_time'].min().strftime('%Y-%m-%d')}** to **{df['start_time'].max().strftime('%Y-%m-%d')}**.")
             
@@ -665,9 +697,8 @@ if st.sidebar.button("Run Analysis"):
                 display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, goal_percentage, OUTPUT_DIR, total_sessions_count)
             
             with tab_praydays:
-                # Use df_unfiltered so Pray Day analytics can see the full history
-                # (including the newly added historical CSVs)
-                display_pray_day_results(df_unfiltered, pray_day_dates)
+                # Use df_pray_days_base so Pray Day analytics excludes GWOP history
+                display_pray_day_results(df_pray_days_base, pray_day_dates)
 
             # Clean up the temporary directory after display
             if os.path.exists(OUTPUT_DIR):
