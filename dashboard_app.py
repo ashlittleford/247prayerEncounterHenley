@@ -96,20 +96,28 @@ def display_pray_day_results(df, pray_day_dates):
     total_repeaters = results.get("repeaters_count", 0)
 
     summary_df = results["summary_df"]
+    newbies_details = results.get("newbies_details", {})
 
     # Calculate Latest Pray Day Newbies Total
     latest_newbies = 0
+    latest_date = None
     if not summary_df.empty:
         # Sort by Date to find the latest
         summary_df["Date"] = pd.to_datetime(summary_df["Date"])
         latest_row = summary_df.sort_values("Date").iloc[-1]
         latest_newbies = latest_row["Total New Users"]
+        latest_date = latest_row["Date"].date()
 
     # Display Top Metrics in requested order
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Individual Pray Day Participants", total_participants)
     c2.metric("Total Repeaters", total_repeaters)
-    c3.metric("Latest Pray Day Newbies Total", latest_newbies)
+    c3.metric("New to Pray Day", latest_newbies)
+
+    # Expander for Newbies details
+    if latest_date and latest_date in newbies_details:
+         with st.expander("New to Pray Day Details"):
+              st.dataframe(newbies_details[latest_date], hide_index=True, use_container_width=True)
 
     st.subheader("Per Pray Day Breakdown")
 
