@@ -80,7 +80,7 @@ def format_date_custom(d):
     suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
     return f"{day}{suffix} {d.strftime('%B %y')}"
 
-def display_pray_day_results(df, pray_day_dates):
+def display_pray_day_results(df, pray_day_dates, full_history_df=None):
     """
     Computes and displays Pray Days analytics.
     """
@@ -89,7 +89,7 @@ def display_pray_day_results(df, pray_day_dates):
         return
 
     # Call the library function
-    results = pal.analyze_pray_days(df, pray_day_dates)
+    results = pal.analyze_pray_days(df, pray_day_dates, full_history_df=full_history_df)
 
     st.header("Pray Days Analysis")
 
@@ -139,6 +139,21 @@ def display_pray_day_results(df, pray_day_dates):
 
         st.dataframe(display_df, use_container_width=True)
 
+        # Download Button for Detailed Breakdown
+        breakdown_details_df = results.get("breakdown_details_df", pd.DataFrame())
+        if not breakdown_details_df.empty:
+            @st.cache_data
+            def convert_df_to_csv(df):
+                return df.to_csv(index=False).encode('utf-8')
+
+            breakdown_csv = convert_df_to_csv(breakdown_details_df)
+            st.download_button(
+                label="Download Breakdown Details (Excel/CSV)",
+                data=breakdown_csv,
+                file_name="pray_day_breakdown_details.csv",
+                mime="text/csv"
+            )
+
         st.markdown("""
         **Metric Explanations:**
         - **Total Participants:** Unique users who booked on this Pray Day.
@@ -163,9 +178,10 @@ def format_change_metric(change_pct):
     return delta, delta_color
 
 @st.cache_data(show_spinner=False)
-def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage):
+def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage, cache_key=None):
     """
     Executes the analysis logic from prayer_analytics_lib.py.
+    cache_key is a string representing the state of input files (timestamps) to force invalidation.
     """
     
     # ----------------------------------------------------
@@ -491,10 +507,21 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
 st.sidebar.header("Data Management")
 
 # Display Last Updated Date
-if os.path.exists("current.csv"):
+display_date = None
+
+# 1. Try to read from metadata file
+if os.path.exists(METADATA_FILE):
+    with open(METADATA_FILE, "r") as f:
+        display_date = f.read().strip()
+
+# 2. Fallback to file mtime if no metadata
+if not display_date and os.path.exists("current.csv"):
     last_modified_timestamp = os.path.getmtime("current.csv")
-    last_modified_date = pd.to_datetime(last_modified_timestamp, unit='s').strftime('%Y-%m-%d %H:%M:%S')
-    st.sidebar.write(f"**current.csv** last updated:\n{last_modified_date}")
+    # Convert to UTC-aware datetime, then to Adelaide time
+    display_date = pd.to_datetime(last_modified_timestamp, unit='s', utc=True).tz_convert('Australia/Adelaide').strftime('%Y-%m-%d %H:%M:%S')
+
+if display_date:
+    st.sidebar.write(f"**current.csv** last updated:\n{display_date}")
 else:
     st.sidebar.warning("current.csv not found.")
 
@@ -516,6 +543,12 @@ if uploaded_file is not None:
         try:
             with open("current.csv", "wb") as f:
                 f.write(uploaded_file.getbuffer())
+
+            # Update metadata with current Adelaide time
+            now_adelaide = pd.Timestamp.now(tz='Australia/Adelaide').strftime('%Y-%m-%d %H:%M:%S')
+            with open(METADATA_FILE, "w") as f:
+                f.write(now_adelaide)
+
             st.session_state['upload_success'] = True
             # Trigger a rerun to update the date and potentially the analysis
             st.rerun()
@@ -718,14 +751,50 @@ if st.sidebar.button("Run Analysis"):
                 os.rmdir(OUTPUT_DIR)
             
             with st.spinner("Running complex analysis..."):
+                # Calculate cache key based on file modification times
+                cache_key = get_data_hash(input_files)
+
                 # Updated call to retrieve total_sessions_count and df_unfiltered
                 df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count, df_unfiltered = run_full_analysis(
                     input_files, 
                     OUTPUT_DIR, 
                     start_date, 
                     end_date, 
-                    goal_percentage
+                    goal_percentage,
+                    cache_key=cache_key
                 )
+
+            # Create a dedicated DF for Pray Day analysis that strictly EXCLUDES gwop.csv to ensure "New Users" logic is correct
+            # even if 'Include GWOP' is ticked for general analytics.
+            # 1. Identify valid base files
+            valid_base_files = [f for f in base_input_files if os.path.exists(f)]
+
+            # 2. Load them
+            if valid_base_files:
+                # Load duplicates map again (quick enough) or reuse if I could refactor, but loading is safer.
+                email_dupes_path = "email_duplicates.csv"
+                email_map_pd = {}
+                if os.path.exists(email_dupes_path):
+                    email_dupes_df_pd = pd.read_csv(email_dupes_path)
+                    for _, row in email_dupes_df_pd.iterrows():
+                        p = str(row["primary"] or "").strip().lower()
+                        a = str(row["additional"] or "").strip().lower()
+                        if p and a:
+                            email_map_pd[a] = p
+
+                df_pray_days_base = pal.load_and_combine_csvs(valid_base_files)
+                df_pray_days_base = pal.normalize_columns(df_pray_days_base)
+                df_pray_days_base["person_key"] = df_pray_days_base.apply(pal.make_person_key, axis=1, args=(email_map_pd,))
+                df_pray_days_base["person_name"] = df_pray_days_base.apply(
+                    lambda r: "UNKNOWN"
+                    if r["person_key"] == "UNKNOWN"
+                    else f"{str(r['firstname'] or '').strip()} {str(r['lastname'] or '').strip()}".strip(),
+                    axis=1,
+                )
+                df_pray_days_base = pal.calculate_hours(df_pray_days_base)
+            else:
+                df_pray_days_base = pd.DataFrame() # Fallback
+
         
             st.success(f"Analysis complete for **{len(df)}** bookings from **{df['start_time'].min().strftime('%Y-%m-%d')}** to **{df['start_time'].max().strftime('%Y-%m-%d')}**.")
             
@@ -740,9 +809,10 @@ if st.sidebar.button("Run Analysis"):
                 display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, goal_percentage, OUTPUT_DIR, total_sessions_count)
             
             with tab_praydays:
-                # Use df_unfiltered so Pray Day analytics can see the full history
-                # (including the newly added historical CSVs)
-                display_pray_day_results(df_unfiltered, pray_day_dates)
+                # Use df_pray_days_base if exclusion is requested, otherwise use df_unfiltered
+                # Always pass df_unfiltered as full_history_df for Total Hours calculation
+                df_for_status = df_pray_days_base if exclude_gwop_newness else df_unfiltered
+                display_pray_day_results(df_for_status, pray_day_dates, full_history_df=df_unfiltered)
 
             # Clean up the temporary directory after display
             if os.path.exists(OUTPUT_DIR):
