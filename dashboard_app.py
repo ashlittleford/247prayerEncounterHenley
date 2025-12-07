@@ -139,6 +139,21 @@ def display_pray_day_results(df, pray_day_dates, exclude_gwop_new_logic=False):
 
         st.dataframe(display_df, use_container_width=True)
 
+        # Helper to convert DF to CSV for download
+        @st.cache_data
+        def convert_df_to_csv(df):
+            return df.to_csv(index=False).encode('utf-8')
+
+        # Download Button for Breakdown
+        if "breakdown_details" in results and not results["breakdown_details"].empty:
+             breakdown_csv = convert_df_to_csv(results["breakdown_details"])
+             st.download_button(
+                 label="Download Breakdown Details (Excel/CSV)",
+                 data=breakdown_csv,
+                 file_name='pray_day_breakdown.csv',
+                 mime='text/csv',
+             )
+
         st.markdown("""
         **Metric Explanations:**
         - **Total Participants:** Unique users who booked on this Pray Day.
