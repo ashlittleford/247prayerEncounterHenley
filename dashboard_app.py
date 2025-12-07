@@ -488,9 +488,17 @@ else:
     st.sidebar.warning("current.csv not found.")
 
 # File Uploader
-uploaded_file = st.sidebar.file_uploader("Upload new current.csv", type=['csv'])
+# NOTE: Removed type=['csv'] restriction to support mobile uploads where MIME types can be tricky.
+uploaded_file = st.sidebar.file_uploader("Upload new current.csv", type=None)
 
 if uploaded_file is not None:
+    # Validate extension or MIME type here if strictly needed, but for now we trust the user
+    # or handle read errors in the library.
+
+    # Check filename extension to warn user if it looks wrong, but allow upload.
+    if not uploaded_file.name.lower().endswith('.csv'):
+        st.sidebar.warning("File does not have .csv extension. Please ensure it is a valid CSV.")
+
     # Option to commit/replace
     if st.sidebar.button("Replace current.csv with uploaded file"):
         # Save the file
