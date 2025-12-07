@@ -163,7 +163,6 @@ def format_change_metric(change_pct):
     return delta, delta_color
 
 @st.cache_data(show_spinner=False)
-def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage, config_timestamps=None):
 def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage, cache_key=None):
     """
     Executes the analysis logic from prayer_analytics_lib.py.
@@ -646,102 +645,7 @@ OUTPUT_DIR = "temp_dashboard_out"
 
 
 # --- 3. Main execution block with a Run button ---
-
-if st.sidebar.button("Run Analysis"):
-    # ... (File checking and analysis logic remains the same) ...
-    # Define input files
-    base_input_files = ["initial.csv", "current.csv", "prayday1.csv", "prayday2.csv", "prayday3.csv", "prayday4.csv"]
-    input_files = base_input_files + ["gwop.csv"] if include_gwop else base_input_files
-    
-    # Check if files exist
-    # Filter only existing files to avoid crashing if one is missing,
-    # but ensure we have at least something to run.
-    input_files = [f for f in input_files if os.path.exists(f)]
-
-    if not input_files:
-        st.error(f"Cannot run analysis. No valid input files found (checked initial.csv, current.csv, gwop.csv, prayday[1-4].csv).")
-    else:
-        try:
-            # Clean up the temporary directory before running
-            if os.path.exists(OUTPUT_DIR):
-                for f in os.listdir(OUTPUT_DIR):
-                    os.remove(os.path.join(OUTPUT_DIR, f))
-                os.rmdir(OUTPUT_DIR)
-            
-            with st.spinner("Running complex analysis..."):
-                # Get timestamps for config files to force cache invalidation if they change
-                config_timestamps = {}
-                for f in ["email_duplicates.csv", "person_merges.csv"]:
-                    if os.path.exists(f):
-                        config_timestamps[f] = os.path.getmtime(f)
-                # Generate a cache key based on modification times of config files
-                # This ensures that if the user updates email_duplicates or person_merges, the cache is invalidated.
-                config_files = ["email_duplicates.csv", "person_merges.csv"]
-                cache_key_parts = []
-                for cf in config_files:
-                    if os.path.exists(cf):
-                        cache_key_parts.append(f"{cf}:{os.path.getmtime(cf)}")
-                cache_key_str = "|".join(cache_key_parts)
-
-                # Updated call to retrieve total_sessions_count and df_unfiltered
-                df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count, df_unfiltered = run_full_analysis(
-                    input_files, 
-                    OUTPUT_DIR, 
-                    start_date, 
-                    end_date, 
-                    goal_percentage,
-                    config_timestamps
-                    cache_key=cache_key_str
-                )
-        
-            st.success(f"Analysis complete for **{len(df)}** bookings from **{df['start_time'].min().strftime('%Y-%m-%d')}** to **{df['start_time'].max().strftime('%Y-%m-%d')}**.")
-            
-            # Ensure OUTPUT_DIR exists (it might not if run_full_analysis was cached)
-            os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-            # Create Tabs
-            tab_general, tab_praydays, tab_admin = st.tabs(["General Analytics", "Pray Days Analytics", "Admin"])
-
-            with tab_general:
-                # Updated call to pass total_sessions_count
-                display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, goal_percentage, OUTPUT_DIR, total_sessions_count)
-            
-            with tab_praydays:
-                # Use df_unfiltered so Pray Day analytics can see the full history
-                # (including the newly added historical CSVs)
-                display_pray_day_results(df_unfiltered, pray_day_dates, exclude_gwop_new_logic=exclude_gwop_new) # Re-added exclude_gwop_new which was missing in sidebar definition but referenced
-
-            with tab_admin:
-                st.header("Pray Day Configuration")
-
-                # Customization 5: Exclude GWOP from New to Pray Day Logic
-                # We can move this here if desired, but user asked for "Pray Day input configuration".
-                # The checkbox "Exclude GWOP..." was in sidebar. I'll leave a note or duplicate it?
-                # Actually, the user said "I want the Pray Day input configuration to go there".
-                # The checkbox is technically part of the configuration for Pray Days.
-                # However, the run button is in sidebar. The checkbox state needs to be known BEFORE run.
-                # So if I move the checkbox here, it won't be visible/changeable until AFTER run?
-                # No, Tabs are only visible if I put them outside the "Run Analysis" block or inside?
-                # Currently the tabs are created INSIDE the "Run Analysis" block.
-                # This means the Admin tab is only visible AFTER analysis is run.
-                # This is bad for configuration.
-
-                # RE-THINK: The Tabs should probably be always visible?
-                # But the content of "General" and "Pray Days" depends on the analysis result.
-
-                # Maybe I should show the Admin tab ALWAYS, and the other tabs only when data is ready?
-                # Or structure it differently.
-                pass
-
-                # I will handle the UI restructuring in the next step.
-                # For now I am just overwriting the file with the function changes.
-                # Wait, I cannot overwrite `dashboard_app.py` partially.
-                # I need to implement the UI logic correctly in this overwrite.
-
-        except ValueError as e:
-            st.error(str(e))
-        except Exception as e:
-            st.error(f"An unexpected error occurred during analysis or display. Please check `prayer_analytics_lib.py`. Error: {e}")
+# (Old block removed in favor of RESTRUCTURING UI block below)
 
 
 # --- RESTRUCTURING UI ---
