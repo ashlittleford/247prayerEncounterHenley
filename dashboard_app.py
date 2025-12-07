@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import json
+import html
 from io import BytesIO
 from datetime import timedelta
 import re 
@@ -79,7 +81,7 @@ def format_date_custom(d):
     suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
     return f"{day}{suffix} {d.strftime('%B %y')}"
 
-def display_pray_day_results(df, pray_day_dates):
+def display_pray_day_results(df, pray_day_dates, full_history_df=None):
     """
     Computes and displays Pray Days analytics.
     """
@@ -88,7 +90,7 @@ def display_pray_day_results(df, pray_day_dates):
         return
 
     # Call the library function
-    results = pal.analyze_pray_days(df, pray_day_dates)
+    results = pal.analyze_pray_days(df, pray_day_dates, full_history_df=full_history_df)
 
     st.header("Pray Days Analysis")
 
@@ -177,9 +179,10 @@ def format_change_metric(change_pct):
     return delta, delta_color
 
 @st.cache_data(show_spinner=False)
-def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage):
+def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage, cache_key=None):
     """
     Executes the analysis logic from prayer_analytics_lib.py.
+    cache_key is a string representing the state of input files (timestamps) to force invalidation.
     """
     
     # ----------------------------------------------------
@@ -583,37 +586,150 @@ goal_percentage = st.sidebar.slider(
 if goal_percentage == 0:
     goal_percentage = None
 
-# Customization 4: Pray Day Dates (Persisted)
-st.sidebar.subheader("Pray Day Configuration")
+# Customization 4: Pray Day Input (Persisted as JSON)
+st.sidebar.subheader("Pray Day Input")
 
-# Logic to load/save
-def load_pray_days():
-    if os.path.exists(PRAY_DAYS_FILE):
-        with open(PRAY_DAYS_FILE, "r") as f:
-            return f.read()
-    return ""
-
-def save_pray_days(text):
+# Logic to load/save (Handles migration from old TXT if JSON missing)
+def save_pray_days_config(data):
     with open(PRAY_DAYS_FILE, "w") as f:
-        f.write(text)
+        json.dump(data, f, indent=4)
+
+def load_pray_days_config():
+    # 1. Try JSON first
+    if os.path.exists(PRAY_DAYS_FILE):
+        try:
+            with open(PRAY_DAYS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+
+    # 2. Migration: Check for old TXT file
+    old_file = "pray_days.txt"
+    if os.path.exists(old_file):
+        dates = []
+        try:
+            with open(old_file, "r") as f:
+                lines = f.read().split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line:
+                        try:
+                            # Try parsing
+                            try:
+                                dt = pd.to_datetime(line, dayfirst=False).date()
+                            except:
+                                dt = pd.to_datetime(line, dayfirst=True).date()
+                            dates.append({"date": dt.isoformat(), "label": ""})
+                        except:
+                            pass
+
+            # Save to new JSON format immediately
+            save_pray_days_config(dates)
+            return dates
+        except Exception as e:
+            st.sidebar.error(f"Migration error: {e}")
+            return []
+
+    return []
+
+def get_data_hash(files):
+    """Calculates a simple hash (timestamp string) based on file modification times to handle cache invalidation."""
+    timestamps = []
+    # Check duplicate email file
+    if os.path.exists("email_duplicates.csv"):
+        timestamps.append(str(os.path.getmtime("email_duplicates.csv")))
+
+    for f in files:
+        if os.path.exists(f):
+            timestamps.append(str(os.path.getmtime(f)))
+
+    return "_".join(timestamps)
 
 # Initialize session state if not set
-if 'pray_days_input' not in st.session_state:
-    st.session_state['pray_days_input'] = load_pray_days()
+if 'pray_days_list' not in st.session_state:
+    st.session_state['pray_days_list'] = load_pray_days_config()
 
-# Callback to save changes
-def on_pray_days_change():
-    save_pray_days(st.session_state['pray_days_input_widget'])
-    st.session_state['pray_days_input'] = st.session_state['pray_days_input_widget']
+# --- Input Area ---
+c1, c2 = st.sidebar.columns([0.6, 0.4])
 
-pray_days_input = st.sidebar.text_area(
-    "Pray Day Dates",
-    value=st.session_state['pray_days_input'],
-    height=100,
-    help="Enter each Pray Day date on a new line. Supports YYYY-MM-DD and DD-MM-YYYY.",
-    key='pray_days_input_widget',
-    on_change=on_pray_days_change
-)
+new_date = c1.date_input("Date", value=None, key="widget_new_date")
+new_label = c2.text_input("Label", placeholder="Optional", key="widget_new_label")
+
+def add_pray_day():
+    # Use the session state values directly from the widget keys
+    d_val = st.session_state.widget_new_date
+    l_val = st.session_state.widget_new_label
+
+    if d_val:
+        d_str = d_val.isoformat()
+        # Check if already exists
+        exists = any(d['date'] == d_str for d in st.session_state['pray_days_list'])
+        if not exists:
+            st.session_state['pray_days_list'].append({
+                "date": d_str,
+                "label": l_val.strip()
+            })
+            # Save immediately
+            save_pray_days_config(st.session_state['pray_days_list'])
+            # We don't need to manually clear widgets if we rely on rerun,
+            # but to really clear them we'd need to manipulate the key state or use a form.
+            # Simpler: just rerun. The user will manually clear if they want, or we can force clear:
+            # But changing key values requires a bit of state management hack.
+            # Using st.rerun() is enough to update the list.
+        else:
+            st.sidebar.warning("This date is already in the list.")
+
+if st.sidebar.button("Add Pray Day", on_click=add_pray_day):
+    pass
+
+# --- Display List (Styled Bubbles) ---
+st.sidebar.write("**Configured Days:**")
+
+if st.session_state['pray_days_list']:
+    # Sort by date
+    sorted_days = sorted(st.session_state['pray_days_list'], key=lambda x: x['date'])
+
+    for item in sorted_days:
+        d_str = item['date']
+        lbl = item['label']
+
+        # Format date for display
+        d_obj = pd.to_datetime(d_str).date()
+        display_str = d_obj.strftime("%d %b %Y")
+        if lbl:
+            # Escape label for security
+            safe_lbl = html.escape(lbl)
+            display_str += f" - <strong>{safe_lbl}</strong>"
+
+        col_text, col_x = st.sidebar.columns([0.85, 0.15])
+
+        with col_text:
+             # Removed fixed color to support dark mode better
+             st.markdown(f"""
+             <div style="
+                background-color: #f0f2f6;
+                border-left: 5px solid #ff4b4b;
+                padding: 5px 10px;
+                border-radius: 5px;
+                font-size: 0.85em;
+                margin-bottom: 5px;
+                color: black;
+             ">
+                {display_str}
+             </div>
+             """, unsafe_allow_html=True)
+
+        with col_x:
+            if st.button("✕", key=f"del_{d_str}", help="Remove"):
+                st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != d_str]
+                save_pray_days_config(st.session_state['pray_days_list'])
+                st.rerun()
+else:
+    st.sidebar.info("No Pray Days configured.")
+
+
+# Option to exclude GWOP from New User calculation
+exclude_gwop_newness = st.sidebar.checkbox("Exclude GWOP from 'New to Pray Day' Logic", value=True)
 
 # Parse Pray Days
 pray_day_dates = []
@@ -661,14 +777,50 @@ if st.sidebar.button("Run Analysis"):
                 os.rmdir(OUTPUT_DIR)
             
             with st.spinner("Running complex analysis..."):
+                # Calculate cache key based on file modification times
+                cache_key = get_data_hash(input_files)
+
                 # Updated call to retrieve total_sessions_count and df_unfiltered
                 df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count, df_unfiltered = run_full_analysis(
                     input_files, 
                     OUTPUT_DIR, 
                     start_date, 
                     end_date, 
-                    goal_percentage
+                    goal_percentage,
+                    cache_key=cache_key
                 )
+
+            # Create a dedicated DF for Pray Day analysis that strictly EXCLUDES gwop.csv to ensure "New Users" logic is correct
+            # even if 'Include GWOP' is ticked for general analytics.
+            # 1. Identify valid base files
+            valid_base_files = [f for f in base_input_files if os.path.exists(f)]
+
+            # 2. Load them
+            if valid_base_files:
+                # Load duplicates map again (quick enough) or reuse if I could refactor, but loading is safer.
+                email_dupes_path = "email_duplicates.csv"
+                email_map_pd = {}
+                if os.path.exists(email_dupes_path):
+                    email_dupes_df_pd = pd.read_csv(email_dupes_path)
+                    for _, row in email_dupes_df_pd.iterrows():
+                        p = str(row["primary"] or "").strip().lower()
+                        a = str(row["additional"] or "").strip().lower()
+                        if p and a:
+                            email_map_pd[a] = p
+
+                df_pray_days_base = pal.load_and_combine_csvs(valid_base_files)
+                df_pray_days_base = pal.normalize_columns(df_pray_days_base)
+                df_pray_days_base["person_key"] = df_pray_days_base.apply(pal.make_person_key, axis=1, args=(email_map_pd,))
+                df_pray_days_base["person_name"] = df_pray_days_base.apply(
+                    lambda r: "UNKNOWN"
+                    if r["person_key"] == "UNKNOWN"
+                    else f"{str(r['firstname'] or '').strip()} {str(r['lastname'] or '').strip()}".strip(),
+                    axis=1,
+                )
+                df_pray_days_base = pal.calculate_hours(df_pray_days_base)
+            else:
+                df_pray_days_base = pd.DataFrame() # Fallback
+
         
             st.success(f"Analysis complete for **{len(df)}** bookings from **{df['start_time'].min().strftime('%Y-%m-%d')}** to **{df['start_time'].max().strftime('%Y-%m-%d')}**.")
             
@@ -683,9 +835,10 @@ if st.sidebar.button("Run Analysis"):
                 display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, goal_percentage, OUTPUT_DIR, total_sessions_count)
             
             with tab_praydays:
-                # Use df_unfiltered so Pray Day analytics can see the full history
-                # (including the newly added historical CSVs)
-                display_pray_day_results(df_unfiltered, pray_day_dates)
+                # Use df_pray_days_base if exclusion is requested, otherwise use df_unfiltered
+                # Always pass df_unfiltered as full_history_df for Total Hours calculation
+                df_for_status = df_pray_days_base if exclude_gwop_newness else df_unfiltered
+                display_pray_day_results(df_for_status, pray_day_dates, full_history_df=df_unfiltered)
 
             # Clean up the temporary directory after display
             if os.path.exists(OUTPUT_DIR):
