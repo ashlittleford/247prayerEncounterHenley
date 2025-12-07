@@ -81,7 +81,7 @@ def format_date_custom(d):
     suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
     return f"{day}{suffix} {d.strftime('%B %y')}"
 
-def display_pray_day_results(df, pray_day_dates):
+def display_pray_day_results(df, pray_day_dates, exclude_gwop_new_logic=False):
     """
     Computes and displays Pray Days analytics.
     """
@@ -90,7 +90,7 @@ def display_pray_day_results(df, pray_day_dates):
         return
 
     # Call the library function
-    results = pal.analyze_pray_days(df, pray_day_dates)
+    results = pal.analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=exclude_gwop_new_logic)
 
     st.header("Pray Days Analysis")
 
@@ -762,7 +762,7 @@ if st.sidebar.button("Run Analysis"):
             with tab_praydays:
                 # Use df_unfiltered so Pray Day analytics can see the full history
                 # (including the newly added historical CSVs)
-                display_pray_day_results(df_unfiltered, pray_day_dates)
+                display_pray_day_results(df_unfiltered, pray_day_dates, exclude_gwop_new_logic=exclude_gwop_new)
 
             # Clean up the temporary directory after display
             if os.path.exists(OUTPUT_DIR):
