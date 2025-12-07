@@ -16,8 +16,7 @@ import prayer_analytics_lib as pal
 # --- CONFIGURATION & SETUP ---
 LOGO_FILE = "logo.png"          
 CUSTOM_LOGO_WIDTH = 100         
-PRAY_DAYS_FILE = "pray_days.txt"
-METADATA_FILE = "current_metadata.txt"
+PRAY_DAYS_FILE = "pray_days.json"
 
 # 1. Set page config FIRST
 st.set_page_config(layout="wide", page_title="Encounter Henley Prayer Room Insights")
@@ -553,6 +552,8 @@ goal_percentage = st.sidebar.slider(
 if goal_percentage == 0:
     goal_percentage = None
 
+st.sidebar.markdown('---')
+
 # Customization 4: Pray Day Input (Persisted as JSON)
 st.sidebar.subheader("Pray Day Input")
 
@@ -598,19 +599,6 @@ def load_pray_days_config():
             return []
 
     return []
-
-def get_data_hash(files):
-    """Calculates a simple hash (timestamp string) based on file modification times to handle cache invalidation."""
-    timestamps = []
-    # Check duplicate email file
-    if os.path.exists("email_duplicates.csv"):
-        timestamps.append(str(os.path.getmtime("email_duplicates.csv")))
-
-    for f in files:
-        if os.path.exists(f):
-            timestamps.append(str(os.path.getmtime(f)))
-
-    return "_".join(timestamps)
 
 # Initialize session state if not set
 if 'pray_days_list' not in st.session_state:
@@ -671,16 +659,20 @@ if st.session_state['pray_days_list']:
         col_text, col_x = st.sidebar.columns([0.85, 0.15], vertical_alignment="center")
 
         with col_text:
-             # Removed fixed color to support dark mode better
+             # Use site accent color #7A8AB2
+             # Also increased padding to match button height and align better
              st.markdown(f"""
              <div style="
                 background-color: #f0f2f6;
-                border-left: 5px solid #ff4b4b;
-                padding: 5px 10px;
+                border-left: 5px solid #7A8AB2;
+                padding: 10px 10px;
                 border-radius: 5px;
                 font-size: 0.85em;
                 margin-bottom: 5px;
                 color: black;
+                display: flex;
+                align-items: center;
+                height: 100%;
              ">
                 {display_str}
              </div>
@@ -694,21 +686,16 @@ if st.session_state['pray_days_list']:
 else:
     st.sidebar.info("No Pray Days configured.")
 
+# Customization 5: Exclude GWOP from New to Pray Day Logic
+exclude_gwop_new = st.sidebar.checkbox(
+    "Exclude GWOP from 'New to Pray Day' Logic",
+    value=False,
+    help="If checked, GWOP data will be ignored when determining if a user is 'new' (first-time booking). However, their total hours will still include GWOP time."
+)
 
-# Option to exclude GWOP from New User calculation
-exclude_gwop_newness = st.sidebar.checkbox("Exclude GWOP from 'New to Pray Day' Logic", value=True)
 
-# Parse Pray Days
-pray_day_dates = []
-if st.session_state.get('pray_days_list'):
-    for item in st.session_state['pray_days_list']:
-        d_str = item.get('date')
-        if d_str:
-            try:
-                dt = pd.to_datetime(d_str).date()
-                pray_day_dates.append(dt)
-            except:
-                pass
+# Extract simple list of dates for analysis
+pray_day_dates = [pd.to_datetime(x['date']).date() for x in st.session_state['pray_days_list']]
 
 # Define a temporary in-memory output directory (required by the lib functions)
 OUTPUT_DIR = "temp_dashboard_out"
