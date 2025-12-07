@@ -176,9 +176,10 @@ def format_change_metric(change_pct):
     return delta, delta_color
 
 @st.cache_data(show_spinner=False)
-def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage):
+def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percentage, cache_key=None):
     """
     Executes the analysis logic from prayer_analytics_lib.py.
+    cache_key is a string representing the state of input files (timestamps) to force invalidation.
     """
     
     # ----------------------------------------------------
@@ -579,6 +580,19 @@ def save_pray_days(text):
     with open(PRAY_DAYS_FILE, "w") as f:
         f.write(text)
 
+def get_data_hash(files):
+    """Calculates a simple hash (timestamp string) based on file modification times to handle cache invalidation."""
+    timestamps = []
+    # Check duplicate email file
+    if os.path.exists("email_duplicates.csv"):
+        timestamps.append(str(os.path.getmtime("email_duplicates.csv")))
+
+    for f in files:
+        if os.path.exists(f):
+            timestamps.append(str(os.path.getmtime(f)))
+
+    return "_".join(timestamps)
+
 # Initialize session state if not set
 if 'pray_days_input' not in st.session_state:
     st.session_state['pray_days_input'] = load_pray_days()
@@ -646,13 +660,17 @@ if st.sidebar.button("Run Analysis"):
                 os.rmdir(OUTPUT_DIR)
             
             with st.spinner("Running complex analysis..."):
+                # Calculate cache key based on file modification times
+                cache_key = get_data_hash(input_files)
+
                 # Updated call to retrieve total_sessions_count and df_unfiltered
                 df, df_monthly_total, metrics_df, user_summary, likelihood_df, recently_stats, total_sessions_count, df_unfiltered = run_full_analysis(
                     input_files, 
                     OUTPUT_DIR, 
                     start_date, 
                     end_date, 
-                    goal_percentage
+                    goal_percentage,
+                    cache_key=cache_key
                 )
 
             # Create a dedicated DF for Pray Day analysis that strictly EXCLUDES gwop.csv to ensure "New Users" logic is correct
