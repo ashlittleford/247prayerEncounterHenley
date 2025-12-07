@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import json
+import html
 from io import BytesIO
 from datetime import timedelta
 import re 
@@ -14,7 +16,7 @@ import prayer_analytics_lib as pal
 # --- CONFIGURATION & SETUP ---
 LOGO_FILE = "logo.png"          
 CUSTOM_LOGO_WIDTH = 100         
-PRAY_DAYS_FILE = "pray_days.txt"
+PRAY_DAYS_FILE = "pray_days.json"
 
 # 1. Set page config FIRST
 st.set_page_config(layout="wide", page_title="Encounter Henley Prayer Room Insights")
@@ -550,55 +552,143 @@ goal_percentage = st.sidebar.slider(
 if goal_percentage == 0:
     goal_percentage = None
 
-# Customization 4: Pray Day Dates (Persisted)
-st.sidebar.subheader("Pray Day Configuration")
+st.sidebar.markdown('---')
 
-# Logic to load/save
-def load_pray_days():
-    if os.path.exists(PRAY_DAYS_FILE):
-        with open(PRAY_DAYS_FILE, "r") as f:
-            return f.read()
-    return ""
+# Customization 4: Pray Day Input (Persisted as JSON)
+st.sidebar.subheader("Pray Day Input")
 
-def save_pray_days(text):
+# Logic to load/save (Handles migration from old TXT if JSON missing)
+def save_pray_days_config(data):
     with open(PRAY_DAYS_FILE, "w") as f:
-        f.write(text)
+        json.dump(data, f, indent=4)
+
+def load_pray_days_config():
+    # 1. Try JSON first
+    if os.path.exists(PRAY_DAYS_FILE):
+        try:
+            with open(PRAY_DAYS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+
+    # 2. Migration: Check for old TXT file
+    old_file = "pray_days.txt"
+    if os.path.exists(old_file):
+        dates = []
+        try:
+            with open(old_file, "r") as f:
+                lines = f.read().split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line:
+                        try:
+                            # Try parsing
+                            try:
+                                dt = pd.to_datetime(line, dayfirst=False).date()
+                            except:
+                                dt = pd.to_datetime(line, dayfirst=True).date()
+                            dates.append({"date": dt.isoformat(), "label": ""})
+                        except:
+                            pass
+
+            # Save to new JSON format immediately
+            save_pray_days_config(dates)
+            return dates
+        except Exception as e:
+            st.sidebar.error(f"Migration error: {e}")
+            return []
+
+    return []
 
 # Initialize session state if not set
-if 'pray_days_input' not in st.session_state:
-    st.session_state['pray_days_input'] = load_pray_days()
+if 'pray_days_list' not in st.session_state:
+    st.session_state['pray_days_list'] = load_pray_days_config()
 
-# Callback to save changes
-def on_pray_days_change():
-    save_pray_days(st.session_state['pray_days_input_widget'])
-    st.session_state['pray_days_input'] = st.session_state['pray_days_input_widget']
+# --- Input Area ---
+c1, c2 = st.sidebar.columns([0.6, 0.4])
 
-pray_days_input = st.sidebar.text_area(
-    "Pray Day Dates",
-    value=st.session_state['pray_days_input'],
-    height=100,
-    help="Enter each Pray Day date on a new line. Supports YYYY-MM-DD and DD-MM-YYYY.",
-    key='pray_days_input_widget',
-    on_change=on_pray_days_change
-)
+new_date = c1.date_input("Date", value=None, key="widget_new_date")
+new_label = c2.text_input("Label", placeholder="Optional", key="widget_new_label")
 
-# Parse Pray Days
-pray_day_dates = []
-if pray_days_input:
-    for line in pray_days_input.split('\n'):
-        line = line.strip()
-        if line:
-            # Enhanced parsing for DD-MM-YYYY
-            try:
-                # First try pandas default (handles YYYY-MM-DD well)
-                # Then try dayfirst=True for DD-MM-YYYY
-                try:
-                    dt = pd.to_datetime(line, dayfirst=False).date()
-                except:
-                    dt = pd.to_datetime(line, dayfirst=True).date()
-                pray_day_dates.append(dt)
-            except:
-                pass # Ignore invalid lines
+def add_pray_day():
+    # Use the session state values directly from the widget keys
+    d_val = st.session_state.widget_new_date
+    l_val = st.session_state.widget_new_label
+
+    if d_val:
+        d_str = d_val.isoformat()
+        # Check if already exists
+        exists = any(d['date'] == d_str for d in st.session_state['pray_days_list'])
+        if not exists:
+            st.session_state['pray_days_list'].append({
+                "date": d_str,
+                "label": l_val.strip()
+            })
+            # Save immediately
+            save_pray_days_config(st.session_state['pray_days_list'])
+            # We don't need to manually clear widgets if we rely on rerun,
+            # but to really clear them we'd need to manipulate the key state or use a form.
+            # Simpler: just rerun. The user will manually clear if they want, or we can force clear:
+            # But changing key values requires a bit of state management hack.
+            # Using st.rerun() is enough to update the list.
+        else:
+            st.sidebar.warning("This date is already in the list.")
+
+if st.sidebar.button("Add Pray Day", on_click=add_pray_day):
+    pass
+
+# --- Display List (Styled Bubbles) ---
+st.sidebar.write("**Configured Days:**")
+
+if st.session_state['pray_days_list']:
+    # Sort by date
+    sorted_days = sorted(st.session_state['pray_days_list'], key=lambda x: x['date'])
+
+    for item in sorted_days:
+        d_str = item['date']
+        lbl = item['label']
+
+        # Format date for display
+        d_obj = pd.to_datetime(d_str).date()
+        display_str = d_obj.strftime("%d %b %Y")
+        if lbl:
+            # Escape label for security
+            safe_lbl = html.escape(lbl)
+            display_str += f" - <strong>{safe_lbl}</strong>"
+
+        col_text, col_x = st.sidebar.columns([0.85, 0.15])
+
+        with col_text:
+             # Use site accent color #7A8AB2
+             # Also increased padding to match button height and align better
+             st.markdown(f"""
+             <div style="
+                background-color: #f0f2f6;
+                border-left: 5px solid #7A8AB2;
+                padding: 10px 10px;
+                border-radius: 5px;
+                font-size: 0.85em;
+                margin-bottom: 5px;
+                color: black;
+                display: flex;
+                align-items: center;
+                height: 100%;
+             ">
+                {display_str}
+             </div>
+             """, unsafe_allow_html=True)
+
+        with col_x:
+            if st.button("✕", key=f"del_{d_str}", help="Remove"):
+                st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != d_str]
+                save_pray_days_config(st.session_state['pray_days_list'])
+                st.rerun()
+else:
+    st.sidebar.info("No Pray Days configured.")
+
+
+# Extract simple list of dates for analysis
+pray_day_dates = [pd.to_datetime(x['date']).date() for x in st.session_state['pray_days_list']]
 
 # Define a temporary in-memory output directory (required by the lib functions)
 OUTPUT_DIR = "temp_dashboard_out"
