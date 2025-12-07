@@ -733,21 +733,15 @@ exclude_gwop_newness = st.sidebar.checkbox("Exclude GWOP from 'New to Pray Day' 
 
 # Parse Pray Days
 pray_day_dates = []
-if pray_days_input:
-    for line in pray_days_input.split('\n'):
-        line = line.strip()
-        if line:
-            # Enhanced parsing for DD-MM-YYYY
+if st.session_state.get('pray_days_list'):
+    for item in st.session_state['pray_days_list']:
+        d_str = item.get('date')
+        if d_str:
             try:
-                # First try pandas default (handles YYYY-MM-DD well)
-                # Then try dayfirst=True for DD-MM-YYYY
-                try:
-                    dt = pd.to_datetime(line, dayfirst=False).date()
-                except:
-                    dt = pd.to_datetime(line, dayfirst=True).date()
+                dt = pd.to_datetime(d_str).date()
                 pray_day_dates.append(dt)
             except:
-                pass # Ignore invalid lines
+                pass
 
 # Define a temporary in-memory output directory (required by the lib functions)
 OUTPUT_DIR = "temp_dashboard_out"
