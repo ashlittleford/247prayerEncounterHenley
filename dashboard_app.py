@@ -15,6 +15,7 @@ import prayer_analytics_lib as pal
 LOGO_FILE = "logo.png"          
 CUSTOM_LOGO_WIDTH = 100         
 PRAY_DAYS_FILE = "pray_days.txt"
+METADATA_FILE = "current_metadata.txt"
 
 # 1. Set page config FIRST
 st.set_page_config(layout="wide", page_title="Encounter Henley Prayer Room Insights")
@@ -504,10 +505,21 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
 st.sidebar.header("Data Management")
 
 # Display Last Updated Date
-if os.path.exists("current.csv"):
+display_date = None
+
+# 1. Try to read from metadata file
+if os.path.exists(METADATA_FILE):
+    with open(METADATA_FILE, "r") as f:
+        display_date = f.read().strip()
+
+# 2. Fallback to file mtime if no metadata
+if not display_date and os.path.exists("current.csv"):
     last_modified_timestamp = os.path.getmtime("current.csv")
-    last_modified_date = pd.to_datetime(last_modified_timestamp, unit='s').strftime('%Y-%m-%d %H:%M:%S')
-    st.sidebar.write(f"**current.csv** last updated:\n{last_modified_date}")
+    # Convert to UTC-aware datetime, then to Adelaide time
+    display_date = pd.to_datetime(last_modified_timestamp, unit='s', utc=True).tz_convert('Australia/Adelaide').strftime('%Y-%m-%d %H:%M:%S')
+
+if display_date:
+    st.sidebar.write(f"**current.csv** last updated:\n{display_date}")
 else:
     st.sidebar.warning("current.csv not found.")
 
@@ -529,6 +541,12 @@ if uploaded_file is not None:
         try:
             with open("current.csv", "wb") as f:
                 f.write(uploaded_file.getbuffer())
+
+            # Update metadata with current Adelaide time
+            now_adelaide = pd.Timestamp.now(tz='Australia/Adelaide').strftime('%Y-%m-%d %H:%M:%S')
+            with open(METADATA_FILE, "w") as f:
+                f.write(now_adelaide)
+
             st.session_state['upload_success'] = True
             # Trigger a rerun to update the date and potentially the analysis
             st.rerun()
