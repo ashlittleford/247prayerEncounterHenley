@@ -34,6 +34,9 @@ def load_and_combine_csvs(file_paths):
     for path in file_paths:
         if os.path.exists(path):
             df = pd.read_csv(path)
+            # Add source file column
+            df["source_file"] = os.path.basename(path)
+
             # Handle different date formats based on file
             if "initial.csv" in path:
                 # Specific format for initial.csv (DD/MM/YYYY HH:MM)
@@ -54,7 +57,7 @@ def normalize_columns(df):
     """Normalizes column names and ensures required columns exist."""
     rename_map = {"phone": "mobile"}
     df = df.rename(columns=rename_map)
-    for col in ["firstname", "lastname", "email", "mobile", "start_time", "end_time"]:
+    for col in ["firstname", "lastname", "email", "mobile", "start_time", "end_time", "source_file"]:
         if col not in df.columns:
             df[col] = np.nan
     return df
@@ -683,13 +686,14 @@ def calculate_average_metrics(df):
             "Value": f"{avg_hours_per_month:.1f}"
         },
     ]
-def analyze_pray_days(df, pray_day_dates):
+def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
     """
     Analyzes data specifically for Pray Days.
 
     Args:
         df: The main dataframe with 'start_time', 'end_time', 'person_key', 'duration'.
         pray_day_dates: A list of datetime.date objects representing the Pray Days.
+        exclude_gwop_from_new_logic: If True, ignores 'gwop.csv' data when determining if a user is 'New'.
 
     Returns:
         A dictionary containing:
@@ -775,8 +779,15 @@ def analyze_pray_days(df, pray_day_dates):
         # Filter global df for these users once
         attendees_bookings = df[df['person_key'].isin(attendees)]
 
+        # Determine which history to use for finding the "First Booking"
+        if exclude_gwop_from_new_logic and 'source_file' in attendees_bookings.columns:
+            # Filter out GWOP bookings for the purpose of checking "newness"
+            history_for_newness = attendees_bookings[attendees_bookings['source_file'] != 'gwop.csv']
+        else:
+            history_for_newness = attendees_bookings
+
         # Group by user to find first booking date
-        user_first_booking = attendees_bookings.groupby('person_key')['start_time'].min().dt.date
+        user_first_booking = history_for_newness.groupby('person_key')['start_time'].min().dt.date
 
         # Identify new users (whose first booking is exactly this p_date)
         new_users_series = user_first_booking[user_first_booking == p_date]
