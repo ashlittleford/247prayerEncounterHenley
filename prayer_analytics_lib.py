@@ -724,6 +724,7 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
 
     summary_data = []
     newbies_details_map = {}
+    details_data = [] # Stores rows for the detailed breakdown CSV
 
     for p_date in pray_day_dates:
         # Filter for this specific pray day
@@ -744,14 +745,43 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
             newbies_details_map[p_date] = pd.DataFrame(columns=["Name", "Total Hours"])
             continue
 
+        # Prepare helpers for detailed breakdown
+        # Map person_key to person_name for this day's attendees
+        day_attendees_info = day_bookings[['person_key', 'person_name']].drop_duplicates('person_key').set_index('person_key')
+        def get_name(pkey):
+            return day_attendees_info.loc[pkey, 'person_name'] if pkey in day_attendees_info.index else "Unknown"
+
         attendees = day_bookings['person_key'].unique()
         total_participants = len(attendees)
         total_hours = day_bookings['duration'].sum()
 
+        # Breakdown: Total Participants
+        # We need user total hours on THIS day for evidence
+        user_hours = day_bookings.groupby('person_key')['duration'].sum()
+
+        for pkey in attendees:
+            hours_val = user_hours.get(pkey, 0)
+            details_data.append({
+                "Date": p_date,
+                "Metric": "Total Participants",
+                "Name": get_name(pkey),
+                "Evidence": f"{hours_val:.2f} hours"
+            })
+
         # Q2: >1 hour on single pray day
         # Sum duration per user on this day
-        user_hours = day_bookings.groupby('person_key')['duration'].sum()
-        over_1h_count = (user_hours > 1).sum()
+        # user_hours calculated above
+        over_1h_users = user_hours[user_hours > 1].index.tolist()
+        over_1h_count = len(over_1h_users)
+
+        for pkey in over_1h_users:
+            hours_val = user_hours.get(pkey, 0)
+            details_data.append({
+                "Date": p_date,
+                "Metric": ">1 Hour Participants",
+                "Name": get_name(pkey),
+                "Evidence": f"{hours_val:.2f} hours"
+            })
 
         # Q3: Done a pray day before
         # Find all previous pray days
@@ -759,9 +789,19 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
         if prev_pray_days:
             # Users who booked on any previous pray day
             prev_attendees = df[df['date'].isin(prev_pray_days)]['person_key'].unique()
-            done_pray_day_before = len(set(attendees).intersection(prev_attendees))
+            users_done_pray_day_before = list(set(attendees).intersection(prev_attendees))
+            done_pray_day_before = len(users_done_pray_day_before)
         else:
             done_pray_day_before = 0
+            users_done_pray_day_before = []
+
+        for pkey in users_done_pray_day_before:
+             details_data.append({
+                "Date": p_date,
+                "Metric": "Done Pray Day Before",
+                "Name": get_name(pkey),
+                "Evidence": "Attended previous Pray Day"
+            })
 
         # Q4: Done a regular hour before
         # Regular hours are bookings on dates NOT in pray_day_dates and BEFORE p_date
@@ -770,7 +810,16 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
             (~df['date'].isin(pray_day_dates))
         ]
         regular_history_users = regular_history_bookings['person_key'].unique()
-        done_regular_before = len(set(attendees).intersection(regular_history_users))
+        users_done_regular_before = list(set(attendees).intersection(regular_history_users))
+        done_regular_before = len(users_done_regular_before)
+
+        for pkey in users_done_regular_before:
+             details_data.append({
+                "Date": p_date,
+                "Metric": "Done Regular Before",
+                "Name": get_name(pkey),
+                "Evidence": "Attended regular slot before"
+            })
 
         # Q5: First time on Pray Day -> Retained
         # "How many people who sign up for the first time for a PRAY DAY then sign up for another hour afterwards?"
@@ -793,12 +842,21 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
         new_users_series = user_first_booking[user_first_booking == p_date]
         new_users_on_this_day = new_users_series.index.tolist()
 
+        for pkey in new_users_on_this_day:
+             details_data.append({
+                "Date": p_date,
+                "Metric": "Total New Users",
+                "Name": get_name(pkey),
+                "Evidence": "First booking ever"
+            })
+
         # Check retention: Do these new users have bookings > p_date?
         # We can reuse attendees_bookings but we need to check if they have bookings > p_date
         # Wait, attendees_bookings contains ALL bookings for these users.
 
         retained_count = 0
         details_df = pd.DataFrame(columns=["Name", "Total Hours"])
+        users_with_future_bookings = []
 
         if new_users_on_this_day:
             # Filter bookings for just the new users
@@ -823,6 +881,14 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
             details_df["Total Hours"] = details_df["Total Hours"].round(2)
             details_df = details_df.sort_values("Total Hours", ascending=False)
 
+        for pkey in users_with_future_bookings:
+             details_data.append({
+                "Date": p_date,
+                "Metric": "New Users Retained",
+                "Name": get_name(pkey),
+                "Evidence": "Booked subsequent slot"
+            })
+
         newbies_details_map[p_date] = details_df
 
         summary_data.append({
@@ -837,10 +903,12 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
         })
 
     summary_df = pd.DataFrame(summary_data)
+    breakdown_details_df = pd.DataFrame(details_data)
 
     return {
         "repeaters_count": repeaters_count,
         "total_unique_participants": total_unique_participants,
         "summary_df": summary_df,
-        "newbies_details": newbies_details_map
+        "newbies_details": newbies_details_map,
+        "breakdown_details": breakdown_details_df
     }
