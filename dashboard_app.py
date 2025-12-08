@@ -751,22 +751,29 @@ tab_general, tab_praydays, tab_admin = st.tabs(["General Analytics", "Pray Days 
 with tab_admin:
     st.header("Pray Day Configuration")
 
+    st.caption("Global Settings")
     # Customization 5: Exclude GWOP from New to Pray Day Logic
-    # Moved from Sidebar to here
     exclude_gwop_new = st.checkbox(
         "Exclude GWOP from 'New to Pray Day' Logic",
         value=False,
         help="If checked, GWOP data will be ignored when determining if a user is 'new' (first-time booking). However, their total hours will still include GWOP time."
     )
 
-    # --- Input Area for Pray Days ---
-    with st.form("add_pray_day_form", clear_on_submit=True):
-        c1, c2 = st.columns([0.6, 0.4])
-        # value=None defaults to today
-        new_date = c1.date_input("Date", value=None)
-        new_label = c2.text_input("Label", placeholder="Optional")
+    st.divider()
+    st.caption("Manage Days")
 
-        submitted = st.form_submit_button("Add Pray Day")
+    # --- Input Area for Pray Days ---
+    with st.form("add_pray_day_form", clear_on_submit=True, border=False):
+        # Using vertical_alignment="bottom" to align button with input fields
+        c1, c2, c3 = st.columns([3, 4, 2], vertical_alignment="bottom")
+
+        with c1:
+            # value=None defaults to today
+            new_date = st.date_input("Date", value=None)
+        with c2:
+            new_label = st.text_input("Label", placeholder="Optional (e.g. 'Global Day')")
+        with c3:
+            submitted = st.form_submit_button("Add Pray Day", use_container_width=True)
 
         if submitted:
             if new_date:
@@ -785,6 +792,7 @@ with tab_admin:
                     st.warning("This date is already in the list.")
 
     # --- Display List (Styled Bubbles) ---
+    st.write("") # Spacer
     st.write("**Configured Days:**")
 
     if st.session_state['pray_days_list']:
@@ -967,7 +975,6 @@ with tab_admin:
 
     with dm_c2:
         st.subheader("Person Merges")
-        st.info("Use this to merge two identities that were not caught by email matching.")
 
         # Display existing
         if os.path.exists("person_merges.csv"):
@@ -1023,6 +1030,8 @@ with tab_admin:
 
                 except Exception as e:
                     st.error(f"Failed to write to file: {e}")
+
+        st.info("Use this to merge two identities that were not caught by email matching.")
 
 
 # --- ANALYSIS EXECUTION ---
