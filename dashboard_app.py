@@ -861,10 +861,59 @@ with tab_admin:
 
         # Display existing
         if os.path.exists("email_duplicates.csv"):
-            with st.expander("View Current Duplicates"):
+            with st.expander("View / Delete Current Duplicates"):
                 try:
                     current_dupes = pd.read_csv("email_duplicates.csv")
-                    st.dataframe(current_dupes, use_container_width=True, hide_index=True)
+
+                    if not current_dupes.empty:
+                        # Add a selection column for deletion
+                        st.write("Select rows to delete:")
+
+                        # Use multiselect for better control than data_editor for now
+                        # Format options as "additional -> primary"
+                        # We use index as key to ensure uniqueness if needed, but emails should be unique
+                        options = []
+                        for idx, row in current_dupes.iterrows():
+                            # Create a display string
+                            display_str = f"{row['additional']} -> {row['primary']}"
+                            options.append((idx, display_str))
+
+                        # Selection widget
+                        selected_indices = st.multiselect(
+                            "Select mappings to remove",
+                            options=options,
+                            format_func=lambda x: x[1]
+                        )
+
+                        if st.button("Delete Selected Mappings"):
+                            if selected_indices:
+                                # Get indices to drop
+                                indices_to_drop = [x[0] for x in selected_indices]
+                                new_df = current_dupes.drop(indices_to_drop)
+
+                                # Save
+                                try:
+                                    new_df.to_csv("email_duplicates.csv", index=False)
+                                    st.success("Selected mappings deleted.")
+
+                                    # Sync
+                                    success, msg = commit_and_push_changes("email_duplicates.csv", f"Update email_duplicates.csv: Deleted {len(indices_to_drop)} mappings")
+                                    if success:
+                                        st.success(msg)
+                                    else:
+                                        st.warning(msg)
+
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error saving file: {e}")
+                            else:
+                                st.info("No mappings selected.")
+
+                        st.markdown("---")
+                        st.dataframe(current_dupes, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No duplicates mapped yet.")
+
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
 
