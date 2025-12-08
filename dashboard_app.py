@@ -7,7 +7,10 @@ import json
 import html
 from io import BytesIO
 from datetime import timedelta
-import re 
+import re
+import csv
+import subprocess
+
 # import streamlit_authenticator as stauth  <-- REMOVED
 
 # Assuming prayer_analytics_lib.py is in the same directory
@@ -73,6 +76,60 @@ st.sidebar.markdown('---')
 
 
 # --- Helper functions to run the library and display results ---
+
+def commit_and_push_changes(filepath, commit_message):
+    """
+    Commits and pushes a specific file to the GitHub repository.
+    Requires 'GITHUB_TOKEN' to be set in st.secrets.
+    """
+    # Check if token exists in secrets
+    if "GITHUB_TOKEN" not in st.secrets:
+        return False, "GITHUB_TOKEN not found in secrets. Changes saved locally only."
+
+    token = st.secrets["GITHUB_TOKEN"]
+
+    # Get current remote url
+    try:
+        remote_url_bytes = subprocess.check_output(["git", "remote", "get-url", "origin"])
+        remote_url = remote_url_bytes.decode("utf-8").strip()
+    except Exception as e:
+        return False, f"Could not determine git remote URL: {str(e)}"
+
+    # Inject token into URL for authentication
+    if "https://" in remote_url:
+        repo_url = remote_url.replace("https://", f"https://{token}@")
+    else:
+        # Fallback if remote is not standard https (e.g. ssh), though Streamlit Cloud usually uses https
+        return False, "Git remote URL format not supported (requires https)."
+
+    try:
+        # Configure git user (local to this run)
+        # We ignore errors here in case it's already configured
+        subprocess.run(["git", "config", "user.email", "streamlit-bot@example.com"], check=False)
+        subprocess.run(["git", "config", "user.name", "Streamlit Bot"], check=False)
+
+        # Add file
+        subprocess.run(["git", "add", filepath], check=True, capture_output=True, text=True)
+
+        # Commit
+        # Check if there are changes first to avoid empty commit error
+        status = subprocess.run(["git", "status", "--porcelain", filepath], capture_output=True, text=True)
+        if not status.stdout.strip():
+            return True, "No changes to commit."
+
+        subprocess.run(["git", "commit", "-m", commit_message], check=True, capture_output=True, text=True)
+
+        # Pull (Rebase to avoid merge conflicts)
+        subprocess.run(["git", "pull", "--rebase", repo_url, "main"], check=True, capture_output=True, text=True)
+
+        # Push
+        subprocess.run(["git", "push", repo_url, "HEAD:main"], check=True, capture_output=True, text=True)
+
+        return True, "Changes committed and pushed to GitHub successfully!"
+    except subprocess.CalledProcessError as e:
+        return False, f"Git error: {e.stderr if e.stderr else str(e)}"
+    except Exception as e:
+        return False, f"Error: {str(e)}"
 
 def format_date_custom(d):
     """Formats date as '24th May 25'."""
@@ -609,6 +666,11 @@ def save_pray_days_config(data):
     with open(PRAY_DAYS_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+    # Sync to Git
+    success, msg = commit_and_push_changes(PRAY_DAYS_FILE, f"Update {PRAY_DAYS_FILE}: Modified Pray Days list")
+    if not success:
+        st.sidebar.warning(f"Saved locally, but Git sync failed: {msg}")
+
 def load_pray_days_config():
     # 1. Try JSON first
     if os.path.exists(PRAY_DAYS_FILE):
@@ -790,56 +852,129 @@ with tab_admin:
 
     st.markdown("---")
     st.header("Data Management")
+    st.info("To persist changes to GitHub, add your `GITHUB_TOKEN` to Streamlit secrets.")
 
     dm_c1, dm_c2 = st.columns(2)
 
     with dm_c1:
         st.subheader("Email Duplicates")
+
+        # Display existing
+        if os.path.exists("email_duplicates.csv"):
+            with st.expander("View Current Duplicates"):
+                try:
+                    current_dupes = pd.read_csv("email_duplicates.csv")
+                    st.dataframe(current_dupes, use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
+
         with st.form("email_dupe_form"):
             primary = st.text_input("Primary Email (The one to keep)")
             additional = st.text_input("Additional Email (The duplicate)")
             submitted = st.form_submit_button("Add Duplicate Mapping")
-            if submitted and primary and additional:
-                # Append to csv
-                # Check if file exists to handle newline correctly
-                mode = "a"
-                prefix = ""
-                if os.path.exists("email_duplicates.csv"):
-                     # check if it ends with newline
-                     with open("email_duplicates.csv", "r") as f:
-                         content = f.read()
-                         if content and not content.endswith("\n"):
-                             prefix = "\n"
-                else:
-                    prefix = "primary,additional\n"
 
-                with open("email_duplicates.csv", mode) as f:
-                    f.write(f"{prefix}{primary},{additional}\n")
-                st.success(f"Mapped {additional} -> {primary}")
+            if submitted and primary and additional:
+                file_path = "email_duplicates.csv"
+                file_exists = os.path.exists(file_path)
+
+                # Check for newline at end of file if it exists
+                needs_newline = False
+                if file_exists:
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            # Move pointer to end minus one character
+                            f.seek(0, os.SEEK_END)
+                            if f.tell() > 0:
+                                f.seek(f.tell() - 1, os.SEEK_SET)
+                                last_char = f.read(1)
+                                if last_char != "\n":
+                                    needs_newline = True
+                    except Exception:
+                        # Fallback for empty or problematic files
+                        pass
+
+                try:
+                    with open(file_path, "a", newline='', encoding="utf-8") as f:
+                        writer = csv.writer(f)
+
+                        # If file didn't exist, write header
+                        if not file_exists:
+                            writer.writerow(["primary", "additional"])
+                        elif needs_newline:
+                            f.write("\n")
+
+                        writer.writerow([primary.strip(), additional.strip()])
+
+                    st.success(f"Mapped {additional} -> {primary}")
+
+                    # Attempt Git Sync
+                    success, msg = commit_and_push_changes(file_path, f"Update {file_path}: Add {additional}")
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.warning(msg)
+
+                except Exception as e:
+                    st.error(f"Failed to write to file: {e}")
 
     with dm_c2:
         st.subheader("Person Merges")
         st.info("Use this to merge two identities that were not caught by email matching.")
+
+        # Display existing
+        if os.path.exists("person_merges.csv"):
+            with st.expander("View Current Merges"):
+                try:
+                    current_merges = pd.read_csv("person_merges.csv")
+                    st.dataframe(current_merges, use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
+
         with st.form("person_merge_form"):
             source = st.text_input("Source Key (To be merged FROM)")
             target = st.text_input("Target Key (To be merged INTO)")
             submitted_merge = st.form_submit_button("Add Merge")
-            if submitted_merge and source and target:
-                # Append to csv
-                mode = "a"
-                prefix = ""
-                if os.path.exists("person_merges.csv"):
-                     # check if it ends with newline
-                     with open("person_merges.csv", "r") as f:
-                         content = f.read()
-                         if content and not content.endswith("\n"):
-                             prefix = "\n"
-                else:
-                    prefix = "source_key,target_key\n"
 
-                with open("person_merges.csv", mode) as f:
-                    f.write(f"{prefix}{source},{target}\n")
-                st.success(f"Merged {source} -> {target}")
+            if submitted_merge and source and target:
+                file_path = "person_merges.csv"
+                file_exists = os.path.exists(file_path)
+
+                # Check for newline
+                needs_newline = False
+                if file_exists:
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            f.seek(0, os.SEEK_END)
+                            if f.tell() > 0:
+                                f.seek(f.tell() - 1, os.SEEK_SET)
+                                last_char = f.read(1)
+                                if last_char != "\n":
+                                    needs_newline = True
+                    except Exception:
+                        pass
+
+                try:
+                    with open(file_path, "a", newline='', encoding="utf-8") as f:
+                        writer = csv.writer(f)
+
+                        if not file_exists:
+                            writer.writerow(["source_key", "target_key"])
+                        elif needs_newline:
+                            f.write("\n")
+
+                        writer.writerow([source.strip(), target.strip()])
+
+                    st.success(f"Merged {source} -> {target}")
+
+                    # Attempt Git Sync
+                    success, msg = commit_and_push_changes(file_path, f"Update {file_path}: Add merge {source} -> {target}")
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.warning(msg)
+
+                except Exception as e:
+                    st.error(f"Failed to write to file: {e}")
 
 
 # --- ANALYSIS EXECUTION ---
@@ -917,4 +1052,3 @@ else:
         st.info("Set your analysis parameters in the sidebar and click **Run Analysis** to generate the dashboard.")
     with tab_praydays:
         st.info("Run analysis to see Pray Day insights.")
-
