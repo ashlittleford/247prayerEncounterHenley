@@ -760,33 +760,29 @@ with tab_admin:
     )
 
     # --- Input Area for Pray Days ---
-    c1, c2 = st.columns([0.6, 0.4])
+    with st.form("add_pray_day_form", clear_on_submit=True):
+        c1, c2 = st.columns([0.6, 0.4])
+        # value=None defaults to today
+        new_date = c1.date_input("Date", value=None)
+        new_label = c2.text_input("Label", placeholder="Optional")
 
-    new_date = c1.date_input("Date", value=None, key="widget_new_date")
-    new_label = c2.text_input("Label", placeholder="Optional", key="widget_new_label")
+        submitted = st.form_submit_button("Add Pray Day")
 
-    def add_pray_day():
-        # Use the session state values directly from the widget keys
-        d_val = st.session_state.widget_new_date
-        l_val = st.session_state.widget_new_label
-
-        if d_val:
-            d_str = d_val.isoformat()
-            # Check if already exists
-            exists = any(d['date'] == d_str for d in st.session_state['pray_days_list'])
-            if not exists:
-                st.session_state['pray_days_list'].append({
-                    "date": d_str,
-                    "label": l_val.strip()
-                })
-                # Save immediately
-                save_pray_days_config(st.session_state['pray_days_list'])
-                # Rerun to update list
-            else:
-                st.warning("This date is already in the list.")
-
-    if st.button("Add Pray Day", on_click=add_pray_day):
-        pass
+        if submitted:
+            if new_date:
+                d_str = new_date.isoformat()
+                # Check if already exists
+                exists = any(d['date'] == d_str for d in st.session_state['pray_days_list'])
+                if not exists:
+                    st.session_state['pray_days_list'].append({
+                        "date": d_str,
+                        "label": new_label.strip() if new_label else ""
+                    })
+                    # Save immediately
+                    save_pray_days_config(st.session_state['pray_days_list'])
+                    st.rerun()
+                else:
+                    st.warning("This date is already in the list.")
 
     # --- Display List (Styled Bubbles) ---
     st.write("**Configured Days:**")
