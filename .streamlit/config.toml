@@ -1,9 +1,0 @@
-[theme]
-# Primary Colors
-primaryColor = "#7A8AB2"           # Muted Blue (Used for buttons, links, sliders, and implicitly for heading/label color)
-backgroundColor = "#FFFFFF"        # White (Main background color of the app canvas)
-secondaryBackgroundColor = "#FFFFFF" # Explicitly set Sidebar/Container background to White
-textColor = "#1E272E"             # Very dark gray/near black (Primary text color for high contrast)
-
-[global]
-showWarningOnDirectExecution = false

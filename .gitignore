@@ -1,0 +1,6 @@
+run_in_bash_session
+*.log
+uploads/
+static/analysis_output/
+__pycache__/
+.streamlit/
