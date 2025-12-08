@@ -730,44 +730,61 @@ with tab_admin:
         # Sort by date
         sorted_days = sorted(st.session_state['pray_days_list'], key=lambda x: x['date'])
 
+        # Prepare strings for st.pills
+        # We need a way to map the display string back to the original item (date)
+        # Unique mapping: date is unique? Yes, logical constraint in add_pray_day checks for duplicate date.
+
+        # Create mapping: "01 Jun 2024 - Label" -> item
+        # We use a dictionary to lookup later
+        pills_options = []
+        pills_map = {}
+
         for item in sorted_days:
             d_str = item['date']
             lbl = item['label']
 
-            # Format date for display
             d_obj = pd.to_datetime(d_str).date()
             display_str = d_obj.strftime("%d %b %Y")
             if lbl:
-                # Escape label for security
-                safe_lbl = html.escape(lbl)
-                display_str += f" - <strong>{safe_lbl}</strong>"
+                display_str += f" - {lbl}"
 
-            col_text, col_x = st.columns([0.85, 0.15], vertical_alignment="center")
+            # Add visual "X" to indicate deletability
+            display_str_with_x = f"{display_str}  ✕"
 
-            with col_text:
-                 # Use site accent color #7A8AB2
-                 st.markdown(f"""
-                 <div style="
-                    background-color: #f0f2f6;
-                    border-left: 5px solid #7A8AB2;
-                    padding: 10px 10px;
-                    border-radius: 5px;
-                    font-size: 0.85em;
-                    margin-bottom: 5px;
-                    color: black;
-                    display: flex;
-                    align-items: center;
-                    height: 100%;
-                 ">
-                    {display_str}
-                 </div>
-                 """, unsafe_allow_html=True)
+            pills_options.append(display_str_with_x)
+            pills_map[display_str_with_x] = d_str
 
-            with col_x:
-                if st.button("✕", key=f"del_{d_str}", help="Remove"):
-                    st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != d_str]
-                    save_pray_days_config(st.session_state['pray_days_list'])
-                    st.rerun()
+        st.caption("Tap a day to remove it from the list.")
+
+        # Use st.pills for display and removal
+        # We pass the full list as 'default', so they appear selected.
+        # If the user clicks one, it becomes deselected.
+        selected_pills = st.pills(
+            "Pray Days",
+            options=pills_options,
+            default=pills_options,
+            selection_mode="multi",
+            label_visibility="collapsed",
+            key="pray_days_pills"
+        )
+
+        # Logic to handle removal
+        # If the length of selected_pills is less than our source list, something was removed.
+        if len(selected_pills) < len(pills_options):
+            # Find what is missing
+            current_set = set(selected_pills)
+            removed_display_str = None
+            for opt in pills_options:
+                if opt not in current_set:
+                    removed_display_str = opt
+                    break
+
+            if removed_display_str:
+                removed_date_str = pills_map[removed_display_str]
+                # Update session state
+                st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != removed_date_str]
+                save_pray_days_config(st.session_state['pray_days_list'])
+                st.rerun()
     else:
         st.info("No Pray Days configured.")
 
