@@ -7,7 +7,8 @@ import json
 import html
 from io import BytesIO
 from datetime import timedelta
-import re 
+import re
+import csv
 # import streamlit_authenticator as stauth  <-- REMOVED
 
 # Assuming prayer_analytics_lib.py is in the same directory
@@ -795,51 +796,107 @@ with tab_admin:
 
     with dm_c1:
         st.subheader("Email Duplicates")
+
+        # Display existing
+        if os.path.exists("email_duplicates.csv"):
+            with st.expander("View Current Duplicates"):
+                try:
+                    current_dupes = pd.read_csv("email_duplicates.csv")
+                    st.dataframe(current_dupes, use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
+
         with st.form("email_dupe_form"):
             primary = st.text_input("Primary Email (The one to keep)")
             additional = st.text_input("Additional Email (The duplicate)")
             submitted = st.form_submit_button("Add Duplicate Mapping")
-            if submitted and primary and additional:
-                # Append to csv
-                # Check if file exists to handle newline correctly
-                mode = "a"
-                prefix = ""
-                if os.path.exists("email_duplicates.csv"):
-                     # check if it ends with newline
-                     with open("email_duplicates.csv", "r") as f:
-                         content = f.read()
-                         if content and not content.endswith("\n"):
-                             prefix = "\n"
-                else:
-                    prefix = "primary,additional\n"
 
-                with open("email_duplicates.csv", mode) as f:
-                    f.write(f"{prefix}{primary},{additional}\n")
-                st.success(f"Mapped {additional} -> {primary}")
+            if submitted and primary and additional:
+                file_path = "email_duplicates.csv"
+                file_exists = os.path.exists(file_path)
+
+                # Check for newline at end of file if it exists
+                needs_newline = False
+                if file_exists:
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            # Move pointer to end minus one character
+                            f.seek(0, os.SEEK_END)
+                            if f.tell() > 0:
+                                f.seek(f.tell() - 1, os.SEEK_SET)
+                                last_char = f.read(1)
+                                if last_char != "\n":
+                                    needs_newline = True
+                    except Exception:
+                        # Fallback for empty or problematic files
+                        pass
+
+                try:
+                    with open(file_path, "a", newline='', encoding="utf-8") as f:
+                        writer = csv.writer(f)
+
+                        # If file didn't exist, write header
+                        if not file_exists:
+                            writer.writerow(["primary", "additional"])
+                        elif needs_newline:
+                            f.write("\n")
+
+                        writer.writerow([primary.strip(), additional.strip()])
+
+                    st.success(f"Mapped {additional} -> {primary}")
+                except Exception as e:
+                    st.error(f"Failed to write to file: {e}")
 
     with dm_c2:
         st.subheader("Person Merges")
         st.info("Use this to merge two identities that were not caught by email matching.")
+
+        # Display existing
+        if os.path.exists("person_merges.csv"):
+            with st.expander("View Current Merges"):
+                try:
+                    current_merges = pd.read_csv("person_merges.csv")
+                    st.dataframe(current_merges, use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
+
         with st.form("person_merge_form"):
             source = st.text_input("Source Key (To be merged FROM)")
             target = st.text_input("Target Key (To be merged INTO)")
             submitted_merge = st.form_submit_button("Add Merge")
-            if submitted_merge and source and target:
-                # Append to csv
-                mode = "a"
-                prefix = ""
-                if os.path.exists("person_merges.csv"):
-                     # check if it ends with newline
-                     with open("person_merges.csv", "r") as f:
-                         content = f.read()
-                         if content and not content.endswith("\n"):
-                             prefix = "\n"
-                else:
-                    prefix = "source_key,target_key\n"
 
-                with open("person_merges.csv", mode) as f:
-                    f.write(f"{prefix}{source},{target}\n")
-                st.success(f"Merged {source} -> {target}")
+            if submitted_merge and source and target:
+                file_path = "person_merges.csv"
+                file_exists = os.path.exists(file_path)
+
+                # Check for newline
+                needs_newline = False
+                if file_exists:
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            f.seek(0, os.SEEK_END)
+                            if f.tell() > 0:
+                                f.seek(f.tell() - 1, os.SEEK_SET)
+                                last_char = f.read(1)
+                                if last_char != "\n":
+                                    needs_newline = True
+                    except Exception:
+                        pass
+
+                try:
+                    with open(file_path, "a", newline='', encoding="utf-8") as f:
+                        writer = csv.writer(f)
+
+                        if not file_exists:
+                            writer.writerow(["source_key", "target_key"])
+                        elif needs_newline:
+                            f.write("\n")
+
+                        writer.writerow([source.strip(), target.strip()])
+
+                    st.success(f"Merged {source} -> {target}")
+                except Exception as e:
+                    st.error(f"Failed to write to file: {e}")
 
 
 # --- ANALYSIS EXECUTION ---
