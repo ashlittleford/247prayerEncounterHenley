@@ -751,103 +751,112 @@ tab_general, tab_praydays, tab_admin = st.tabs(["General Analytics", "Pray Days 
 with tab_admin:
     st.header("Pray Day Configuration")
 
-    # Customization 5: Exclude GWOP from New to Pray Day Logic
-    # Moved from Sidebar to here
-    exclude_gwop_new = st.checkbox(
-        "Exclude GWOP from 'New to Pray Day' Logic",
-        value=False,
-        help="If checked, GWOP data will be ignored when determining if a user is 'new' (first-time booking). However, their total hours will still include GWOP time."
-    )
-
-    # --- Input Area for Pray Days ---
-    with st.form("add_pray_day_form", clear_on_submit=True):
-        c1, c2 = st.columns([0.6, 0.4])
-        # value=None defaults to today
-        new_date = c1.date_input("Date", value=None)
-        new_label = c2.text_input("Label", placeholder="Optional")
-
-        submitted = st.form_submit_button("Add Pray Day")
-
-        if submitted:
-            if new_date:
-                d_str = new_date.isoformat()
-                # Check if already exists
-                exists = any(d['date'] == d_str for d in st.session_state['pray_days_list'])
-                if not exists:
-                    st.session_state['pray_days_list'].append({
-                        "date": d_str,
-                        "label": new_label.strip() if new_label else ""
-                    })
-                    # Save immediately
-                    save_pray_days_config(st.session_state['pray_days_list'])
-                    st.rerun()
-                else:
-                    st.warning("This date is already in the list.")
-
-    # --- Display List (Styled Bubbles) ---
-    st.write("**Configured Days:**")
-
-    if st.session_state['pray_days_list']:
-        # Sort by date
-        sorted_days = sorted(st.session_state['pray_days_list'], key=lambda x: x['date'])
-
-        # Prepare strings for st.pills
-        # We need a way to map the display string back to the original item (date)
-        # Unique mapping: date is unique? Yes, logical constraint in add_pray_day checks for duplicate date.
-
-        # Create mapping: "01 Jun 2024 - Label" -> item
-        # We use a dictionary to lookup later
-        pills_options = []
-        pills_map = {}
-
-        for item in sorted_days:
-            d_str = item['date']
-            lbl = item['label']
-
-            d_obj = pd.to_datetime(d_str).date()
-            display_str = d_obj.strftime("%d %b %Y")
-            if lbl:
-                display_str += f" - {lbl}"
-
-            # Add visual "X" to indicate deletability
-            display_str_with_x = f"{display_str}  ✕"
-
-            pills_options.append(display_str_with_x)
-            pills_map[display_str_with_x] = d_str
-
-        st.caption("Tap a day to remove it from the list.")
-
-        # Use st.pills for display and removal
-        # We pass the full list as 'default', so they appear selected.
-        # If the user clicks one, it becomes deselected.
-        selected_pills = st.pills(
-            "Pray Days",
-            options=pills_options,
-            default=pills_options,
-            selection_mode="multi",
-            label_visibility="collapsed",
-            key="pray_days_pills"
+    with st.container(border=True):
+        st.caption("Global Settings")
+        # Customization 5: Exclude GWOP from New to Pray Day Logic
+        exclude_gwop_new = st.checkbox(
+            "Exclude GWOP from 'New to Pray Day' Logic",
+            value=False,
+            help="If checked, GWOP data will be ignored when determining if a user is 'new' (first-time booking). However, their total hours will still include GWOP time."
         )
 
-        # Logic to handle removal
-        # If the length of selected_pills is less than our source list, something was removed.
-        if len(selected_pills) < len(pills_options):
-            # Find what is missing
-            current_set = set(selected_pills)
-            removed_display_str = None
-            for opt in pills_options:
-                if opt not in current_set:
-                    removed_display_str = opt
-                    break
+        st.divider()
+        st.caption("Manage Days")
 
-            if removed_display_str:
-                removed_date_str = pills_map[removed_display_str]
-                # Update session state
-                st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != removed_date_str]
-                save_pray_days_config(st.session_state['pray_days_list'])
-                st.rerun()
-    else:
-        st.info("No Pray Days configured.")
+        # --- Input Area for Pray Days ---
+        with st.form("add_pray_day_form", clear_on_submit=True):
+            # Using vertical_alignment="bottom" to align button with input fields
+            c1, c2, c3 = st.columns([3, 4, 2], vertical_alignment="bottom")
+
+            with c1:
+                # value=None defaults to today
+                new_date = st.date_input("Date", value=None)
+            with c2:
+                new_label = st.text_input("Label", placeholder="Optional (e.g. 'Global Day')")
+            with c3:
+                submitted = st.form_submit_button("Add Pray Day", use_container_width=True)
+
+            if submitted:
+                if new_date:
+                    d_str = new_date.isoformat()
+                    # Check if already exists
+                    exists = any(d['date'] == d_str for d in st.session_state['pray_days_list'])
+                    if not exists:
+                        st.session_state['pray_days_list'].append({
+                            "date": d_str,
+                            "label": new_label.strip() if new_label else ""
+                        })
+                        # Save immediately
+                        save_pray_days_config(st.session_state['pray_days_list'])
+                        st.rerun()
+                    else:
+                        st.warning("This date is already in the list.")
+
+        # --- Display List (Styled Bubbles) ---
+        st.write("") # Spacer
+        st.write("**Configured Days:**")
+
+        if st.session_state['pray_days_list']:
+            # Sort by date
+            sorted_days = sorted(st.session_state['pray_days_list'], key=lambda x: x['date'])
+
+            # Prepare strings for st.pills
+            # We need a way to map the display string back to the original item (date)
+            # Unique mapping: date is unique? Yes, logical constraint in add_pray_day checks for duplicate date.
+
+            # Create mapping: "01 Jun 2024 - Label" -> item
+            # We use a dictionary to lookup later
+            pills_options = []
+            pills_map = {}
+
+            for item in sorted_days:
+                d_str = item['date']
+                lbl = item['label']
+
+                d_obj = pd.to_datetime(d_str).date()
+                display_str = d_obj.strftime("%d %b %Y")
+                if lbl:
+                    display_str += f" - {lbl}"
+
+                # Add visual "X" to indicate deletability
+                display_str_with_x = f"{display_str}  ✕"
+
+                pills_options.append(display_str_with_x)
+                pills_map[display_str_with_x] = d_str
+
+            st.caption("Tap a day to remove it from the list.")
+
+            # Use st.pills for display and removal
+            # We pass the full list as 'default', so they appear selected.
+            # If the user clicks one, it becomes deselected.
+            selected_pills = st.pills(
+                "Pray Days",
+                options=pills_options,
+                default=pills_options,
+                selection_mode="multi",
+                label_visibility="collapsed",
+                key="pray_days_pills"
+            )
+
+            # Logic to handle removal
+            # If the length of selected_pills is less than our source list, something was removed.
+            if len(selected_pills) < len(pills_options):
+                # Find what is missing
+                current_set = set(selected_pills)
+                removed_display_str = None
+                for opt in pills_options:
+                    if opt not in current_set:
+                        removed_display_str = opt
+                        break
+
+                if removed_display_str:
+                    removed_date_str = pills_map[removed_display_str]
+                    # Update session state
+                    st.session_state['pray_days_list'] = [x for x in st.session_state['pray_days_list'] if x['date'] != removed_date_str]
+                    save_pray_days_config(st.session_state['pray_days_list'])
+                    st.rerun()
+        else:
+            st.info("No Pray Days configured.")
 
     st.markdown("---")
     st.header("Data Management")
