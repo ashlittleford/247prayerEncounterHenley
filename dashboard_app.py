@@ -393,6 +393,9 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
         plot_filepath = os.path.join(outdir, title) 
 
         try:
+            # Ensure output directory exists (crucial if analysis was cached)
+            os.makedirs(outdir, exist_ok=True)
+
             # 1. Execute the plotting function (MUST save the file to plot_filepath inside pal.py)
             plot_func(*args)
             
@@ -1070,6 +1073,9 @@ if st.sidebar.button("Run Analysis"):
                     goal_percentage,
                     config_timestamps
                 )
+
+                # Ensure output directory exists (fix for cached runs where dir was deleted)
+                os.makedirs(OUTPUT_DIR, exist_ok=True)
 
                 # Store results in session state
                 st.session_state['analysis_results'] = results
