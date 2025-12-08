@@ -814,7 +814,7 @@ with tab_admin:
                     prefix = "primary,additional\n"
 
                 with open("email_duplicates.csv", mode) as f:
-                    f.write(f"{prefix}{primary},{additional}")
+                    f.write(f"{prefix}{primary},{additional}\n")
                 st.success(f"Mapped {additional} -> {primary}")
 
     with dm_c2:
@@ -838,7 +838,7 @@ with tab_admin:
                     prefix = "source_key,target_key\n"
 
                 with open("person_merges.csv", mode) as f:
-                    f.write(f"{prefix}{source},{target}")
+                    f.write(f"{prefix}{source},{target}\n")
                 st.success(f"Merged {source} -> {target}")
 
 
