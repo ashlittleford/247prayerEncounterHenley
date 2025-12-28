@@ -898,8 +898,6 @@ with tab_admin:
             with st.expander(merge_label):
                 if not current_merges.empty:
                     st.dataframe(current_merges, use_container_width=True, hide_index=True)
-                except Exception as e:
-                    st.error(f"Error reading file: {e}")
         else:
             st.info("No merges configured yet.")
 
