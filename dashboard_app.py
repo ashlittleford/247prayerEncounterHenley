@@ -895,52 +895,8 @@ with tab_admin:
                     st.dataframe(current_merges, use_container_width=True, hide_index=True)
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
-
-        with st.form("person_merge_form"):
-            source = st.text_input("Source Key (To be merged FROM)")
-            target = st.text_input("Target Key (To be merged INTO)")
-            submitted_merge = st.form_submit_button("Add Merge")
-
-            if submitted_merge and source and target:
-                file_path = "person_merges.csv"
-                file_exists = os.path.exists(file_path)
-
-                # Check for newline
-                needs_newline = False
-                if file_exists:
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            f.seek(0, os.SEEK_END)
-                            if f.tell() > 0:
-                                f.seek(f.tell() - 1, os.SEEK_SET)
-                                last_char = f.read(1)
-                                if last_char != "\n":
-                                    needs_newline = True
-                    except Exception:
-                        pass
-
-                try:
-                    with open(file_path, "a", newline='', encoding="utf-8") as f:
-                        writer = csv.writer(f)
-
-                        if not file_exists:
-                            writer.writerow(["source_key", "target_key"])
-                        elif needs_newline:
-                            f.write("\n")
-
-                        writer.writerow([source.strip(), target.strip()])
-
-                    st.success(f"Merged {source} -> {target}")
-
-                    # Attempt Git Sync
-                    success, msg = commit_and_push_changes(file_path, f"Update {file_path}: Add merge {source} -> {target}")
-                    if success:
-                        st.success(msg)
-                    else:
-                        st.warning(msg)
-
-                except Exception as e:
-                    st.error(f"Failed to write to file: {e}")
+        else:
+            st.info("No merges configured yet.")
 
 
 # --- ANALYSIS EXECUTION ---
