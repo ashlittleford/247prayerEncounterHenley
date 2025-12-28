@@ -869,110 +869,19 @@ with tab_admin:
 
         # Display existing
         if os.path.exists("email_duplicates.csv"):
-            with st.expander("View / Delete Current Duplicates"):
+            with st.expander("View Current Duplicates"):
                 try:
                     current_dupes = pd.read_csv("email_duplicates.csv")
 
                     if not current_dupes.empty:
-                        # Add a selection column for deletion
-                        st.write("Select rows to delete:")
-
-                        # Use multiselect for better control than data_editor for now
-                        # Format options as "additional -> primary"
-                        # We use index as key to ensure uniqueness if needed, but emails should be unique
-                        options = []
-                        for idx, row in current_dupes.iterrows():
-                            # Create a display string
-                            display_str = f"{row['additional']} -> {row['primary']}"
-                            options.append((idx, display_str))
-
-                        # Selection widget
-                        selected_indices = st.multiselect(
-                            "Select mappings to remove",
-                            options=options,
-                            format_func=lambda x: x[1]
-                        )
-
-                        if st.button("Delete Selected Mappings"):
-                            if selected_indices:
-                                # Get indices to drop
-                                indices_to_drop = [x[0] for x in selected_indices]
-                                new_df = current_dupes.drop(indices_to_drop)
-
-                                # Save
-                                try:
-                                    new_df.to_csv("email_duplicates.csv", index=False)
-                                    st.success("Selected mappings deleted.")
-
-                                    # Sync
-                                    success, msg = commit_and_push_changes("email_duplicates.csv", f"Update email_duplicates.csv: Deleted {len(indices_to_drop)} mappings")
-                                    if success:
-                                        st.success(msg)
-                                    else:
-                                        st.warning(msg)
-
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Error saving file: {e}")
-                            else:
-                                st.info("No mappings selected.")
-
-                        st.markdown("---")
                         st.dataframe(current_dupes, use_container_width=True, hide_index=True)
                     else:
                         st.info("No duplicates mapped yet.")
 
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
-
-        with st.form("email_dupe_form"):
-            primary = st.text_input("Primary Email (The one to keep)")
-            additional = st.text_input("Additional Email (The duplicate)")
-            submitted = st.form_submit_button("Add Duplicate Mapping")
-
-            if submitted and primary and additional:
-                file_path = "email_duplicates.csv"
-                file_exists = os.path.exists(file_path)
-
-                # Check for newline at end of file if it exists
-                needs_newline = False
-                if file_exists:
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            # Move pointer to end minus one character
-                            f.seek(0, os.SEEK_END)
-                            if f.tell() > 0:
-                                f.seek(f.tell() - 1, os.SEEK_SET)
-                                last_char = f.read(1)
-                                if last_char != "\n":
-                                    needs_newline = True
-                    except Exception:
-                        # Fallback for empty or problematic files
-                        pass
-
-                try:
-                    with open(file_path, "a", newline='', encoding="utf-8") as f:
-                        writer = csv.writer(f)
-
-                        # If file didn't exist, write header
-                        if not file_exists:
-                            writer.writerow(["primary", "additional"])
-                        elif needs_newline:
-                            f.write("\n")
-
-                        writer.writerow([primary.strip(), additional.strip()])
-
-                    st.success(f"Mapped {additional} -> {primary}")
-
-                    # Attempt Git Sync
-                    success, msg = commit_and_push_changes(file_path, f"Update {file_path}: Add {additional}")
-                    if success:
-                        st.success(msg)
-                    else:
-                        st.warning(msg)
-
-                except Exception as e:
-                    st.error(f"Failed to write to file: {e}")
+        else:
+            st.info("No duplicates mapped yet.")
 
     with dm_c2:
         st.subheader("Person Merges")
@@ -986,52 +895,8 @@ with tab_admin:
                     st.dataframe(current_merges, use_container_width=True, hide_index=True)
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
-
-        with st.form("person_merge_form"):
-            source = st.text_input("Source Key (To be merged FROM)")
-            target = st.text_input("Target Key (To be merged INTO)")
-            submitted_merge = st.form_submit_button("Add Merge")
-
-            if submitted_merge and source and target:
-                file_path = "person_merges.csv"
-                file_exists = os.path.exists(file_path)
-
-                # Check for newline
-                needs_newline = False
-                if file_exists:
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            f.seek(0, os.SEEK_END)
-                            if f.tell() > 0:
-                                f.seek(f.tell() - 1, os.SEEK_SET)
-                                last_char = f.read(1)
-                                if last_char != "\n":
-                                    needs_newline = True
-                    except Exception:
-                        pass
-
-                try:
-                    with open(file_path, "a", newline='', encoding="utf-8") as f:
-                        writer = csv.writer(f)
-
-                        if not file_exists:
-                            writer.writerow(["source_key", "target_key"])
-                        elif needs_newline:
-                            f.write("\n")
-
-                        writer.writerow([source.strip(), target.strip()])
-
-                    st.success(f"Merged {source} -> {target}")
-
-                    # Attempt Git Sync
-                    success, msg = commit_and_push_changes(file_path, f"Update {file_path}: Add merge {source} -> {target}")
-                    if success:
-                        st.success(msg)
-                    else:
-                        st.warning(msg)
-
-                except Exception as e:
-                    st.error(f"Failed to write to file: {e}")
+        else:
+            st.info("No merges configured yet.")
 
 
 # --- ANALYSIS EXECUTION ---
