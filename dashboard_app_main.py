@@ -890,9 +890,16 @@ with tab_admin:
 
         # Display existing
         if os.path.exists("person_merges.csv"):
-            with st.expander("View Current Merges"):
-                try:
-                    current_merges = pd.read_csv("person_merges.csv")
+            try:
+                current_merges = pd.read_csv("person_merges.csv")
+                merge_count = len(current_merges)
+                merge_label = f"View Current Merges ({merge_count})"
+            except:
+                current_merges = pd.DataFrame()
+                merge_label = "View Current Merges (Error)"
+
+            with st.expander(merge_label):
+                if not current_merges.empty:
                     st.dataframe(current_merges, use_container_width=True, hide_index=True)
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
