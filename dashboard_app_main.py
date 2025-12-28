@@ -752,6 +752,7 @@ with tab_admin:
     st.header("Pray Day Configuration")
 
     with st.container(border=False):
+    with st.container(border=True):
         st.caption("Global Settings")
         # Customization 5: Exclude GWOP from New to Pray Day Logic
         exclude_gwop_new = st.checkbox(
@@ -765,6 +766,7 @@ with tab_admin:
 
         # --- Input Area for Pray Days ---
         with st.form("add_pray_day_form", clear_on_submit=True, border=False):
+        with st.form("add_pray_day_form", clear_on_submit=True):
             # Using vertical_alignment="bottom" to align button with input fields
             c1, c2, c3 = st.columns([3, 4, 2], vertical_alignment="bottom")
 
@@ -860,6 +862,7 @@ with tab_admin:
 
     st.markdown("---")
     st.header("Data Management")
+    st.info("To persist changes to GitHub, add your `GITHUB_TOKEN` to Streamlit secrets.")
 
     dm_c1, dm_c2 = st.columns(2)
 
