@@ -765,6 +765,7 @@ with tab_admin:
         st.caption("Manage Days")
 
         # --- Input Area for Pray Days ---
+        with st.form("add_pray_day_form", clear_on_submit=True, border=False):
         with st.form("add_pray_day_form", clear_on_submit=True):
             # Using vertical_alignment="bottom" to align button with input fields
             c1, c2, c3 = st.columns([3, 4, 2], vertical_alignment="bottom")
