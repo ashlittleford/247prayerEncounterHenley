@@ -868,19 +868,17 @@ with tab_admin:
 
         # Display existing
         if os.path.exists("email_duplicates.csv"):
-            try:
-                current_dupes = pd.read_csv("email_duplicates.csv")
-                dupe_count = len(current_dupes)
-                dupe_label = f"View Current Duplicates ({dupe_count})"
-            except:
-                current_dupes = pd.DataFrame()
-                dupe_label = "View Current Duplicates (Error)"
+            with st.expander("View Current Duplicates"):
+                try:
+                    current_dupes = pd.read_csv("email_duplicates.csv")
 
-            with st.expander(dupe_label):
-                if not current_dupes.empty:
-                    st.dataframe(current_dupes, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No duplicates mapped yet.")
+                    if not current_dupes.empty:
+                        st.dataframe(current_dupes, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No duplicates mapped yet.")
+
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
         else:
             st.info("No duplicates mapped yet.")
 
@@ -900,8 +898,8 @@ with tab_admin:
             with st.expander(merge_label):
                 if not current_merges.empty:
                     st.dataframe(current_merges, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No merges configured yet.")
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
         else:
             st.info("No merges configured yet.")
 

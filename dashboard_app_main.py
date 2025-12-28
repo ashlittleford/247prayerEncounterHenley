@@ -752,6 +752,7 @@ with tab_admin:
     st.header("Pray Day Configuration")
 
     with st.container(border=False):
+    with st.container(border=True):
         st.caption("Global Settings")
         # Customization 5: Exclude GWOP from New to Pray Day Logic
         exclude_gwop_new = st.checkbox(
@@ -765,6 +766,7 @@ with tab_admin:
 
         # --- Input Area for Pray Days ---
         with st.form("add_pray_day_form", clear_on_submit=True, border=False):
+        with st.form("add_pray_day_form", clear_on_submit=True):
             # Using vertical_alignment="bottom" to align button with input fields
             c1, c2, c3 = st.columns([3, 4, 2], vertical_alignment="bottom")
 
@@ -860,6 +862,7 @@ with tab_admin:
 
     st.markdown("---")
     st.header("Data Management")
+    st.info("To persist changes to GitHub, add your `GITHUB_TOKEN` to Streamlit secrets.")
 
     dm_c1, dm_c2 = st.columns(2)
 
@@ -868,19 +871,17 @@ with tab_admin:
 
         # Display existing
         if os.path.exists("email_duplicates.csv"):
-            try:
-                current_dupes = pd.read_csv("email_duplicates.csv")
-                dupe_count = len(current_dupes)
-                dupe_label = f"View Current Duplicates ({dupe_count})"
-            except:
-                current_dupes = pd.DataFrame()
-                dupe_label = "View Current Duplicates (Error)"
+            with st.expander("View Current Duplicates"):
+                try:
+                    current_dupes = pd.read_csv("email_duplicates.csv")
 
-            with st.expander(dupe_label):
-                if not current_dupes.empty:
-                    st.dataframe(current_dupes, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No duplicates mapped yet.")
+                    if not current_dupes.empty:
+                        st.dataframe(current_dupes, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No duplicates mapped yet.")
+
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
         else:
             st.info("No duplicates mapped yet.")
 
@@ -900,8 +901,8 @@ with tab_admin:
             with st.expander(merge_label):
                 if not current_merges.empty:
                     st.dataframe(current_merges, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No merges configured yet.")
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
         else:
             st.info("No merges configured yet.")
 
