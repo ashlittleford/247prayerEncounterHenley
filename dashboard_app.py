@@ -751,7 +751,7 @@ tab_general, tab_praydays, tab_admin = st.tabs(["General Analytics", "Pray Days 
 with tab_admin:
     st.header("Pray Day Configuration")
 
-    with st.container(border=True):
+    with st.container(border=False):
         st.caption("Global Settings")
         # Customization 5: Exclude GWOP from New to Pray Day Logic
         exclude_gwop_new = st.checkbox(
@@ -860,7 +860,6 @@ with tab_admin:
 
     st.markdown("---")
     st.header("Data Management")
-    st.info("To persist changes to GitHub, add your `GITHUB_TOKEN` to Streamlit secrets.")
 
     dm_c1, dm_c2 = st.columns(2)
 
@@ -885,7 +884,6 @@ with tab_admin:
 
     with dm_c2:
         st.subheader("Person Merges")
-        st.info("Use this to merge two identities that were not caught by email matching.")
 
         # Display existing
         if os.path.exists("person_merges.csv"):

@@ -751,6 +751,7 @@ tab_general, tab_praydays, tab_admin = st.tabs(["General Analytics", "Pray Days 
 with tab_admin:
     st.header("Pray Day Configuration")
 
+    with st.container(border=False):
     with st.container(border=True):
         st.caption("Global Settings")
         # Customization 5: Exclude GWOP from New to Pray Day Logic
@@ -885,7 +886,6 @@ with tab_admin:
 
     with dm_c2:
         st.subheader("Person Merges")
-        st.info("Use this to merge two identities that were not caught by email matching.")
 
         # Display existing
         if os.path.exists("person_merges.csv"):
