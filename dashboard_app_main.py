@@ -53,6 +53,17 @@ html, body, [class*="css"] {
 .stAlert-warning p {
     color: white !important;
 }
+
+/* MOBILE OPTIMIZATION FOR METRICS */
+@media (max-width: 640px) {
+    /* Force columns containing metrics to be 50% width (2 per row) instead of stacking */
+    div[data-testid="column"]:has(div[data-testid="stMetric"]),
+    div[data-testid="stColumn"]:has(div[data-testid="stMetric"]) {
+        width: calc(50% - 1rem) !important;
+        flex: 1 1 calc(50% - 1rem) !important;
+        min-width: calc(50% - 1rem) !important;
+    }
+}
 </style>
 """
 st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
@@ -421,39 +432,37 @@ def display_results(df, df_monthly_total, metrics_df, user_summary, likelihood_d
 
     # --- Recent Activity (MOVED TO TOP) ---
     st.header("Recent Activity (Unfiltered Data)")
-    col_7, col_28 = st.columns(2)
+
+    # Use 4 columns for a flatter structure to save vertical space on mobile (removes nested subheaders)
+    col_h7, col_u7, col_h28, col_u28 = st.columns(4)
 
     # Last 7 Days
     delta_7, delta_color_7 = format_change_metric(recently_stats["C7"])
-    with col_7:
-        st.subheader("Last 7 Days")
-        cols_h, cols_u = st.columns(2)
-        cols_h.metric(
-            label="Total Hours",
-            value=recently_stats["H7"],
-            delta=delta_7,
-            delta_color=delta_color_7
-        )
-        cols_u.metric(
-            label="Unique Users",
-            value=recently_stats["U7"]
-        )
+
+    col_h7.metric(
+        label="Hours (7 Days)",
+        value=recently_stats["H7"],
+        delta=delta_7,
+        delta_color=delta_color_7
+    )
+    col_u7.metric(
+        label="Users (7 Days)",
+        value=recently_stats["U7"]
+    )
 
     # Last 28 Days
     delta_28, delta_color_28 = format_change_metric(recently_stats["C28"])
-    with col_28:
-        st.subheader("Last 28 Days")
-        cols_h, cols_u = st.columns(2)
-        cols_h.metric(
-            label="Total Hours",
-            value=recently_stats["H28"],
-            delta=delta_28,
-            delta_color=delta_color_28
-        )
-        cols_u.metric(
-            label="Unique Users",
-            value=recently_stats["U28"]
-        )
+
+    col_h28.metric(
+        label="Hours (28 Days)",
+        value=recently_stats["H28"],
+        delta=delta_28,
+        delta_color=delta_color_28
+    )
+    col_u28.metric(
+        label="Users (28 Days)",
+        value=recently_stats["U28"]
+    )
 
     st.markdown("---")
 
