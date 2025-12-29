@@ -53,6 +53,17 @@ html, body, [class*="css"] {
 .stAlert-warning p {
     color: white !important;
 }
+
+/* MOBILE OPTIMIZATION FOR METRICS */
+@media (max-width: 640px) {
+    /* Force columns containing metrics to be 50% width (2 per row) instead of stacking */
+    div[data-testid="column"]:has(div[data-testid="stMetric"]),
+    div[data-testid="stColumn"]:has(div[data-testid="stMetric"]) {
+        width: calc(50% - 1rem) !important;
+        flex: 1 1 calc(50% - 1rem) !important;
+        min-width: calc(50% - 1rem) !important;
+    }
+}
 </style>
 """
 st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
