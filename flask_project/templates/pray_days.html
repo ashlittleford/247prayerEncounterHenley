@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h1 class="h3">Pray Days Analysis</h1>
+    <p class="text-muted">Metrics specific to designated Pray Days.</p>
+</div>
+
+<!-- Metrics -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="metric-card">
+            <div class="metric-label">Total Individual Participants</div>
+            <div class="metric-value">{{ total_participants }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card">
+            <div class="metric-label">Total Repeaters</div>
+            <div class="metric-value">{{ total_repeaters }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card">
+            <div class="metric-label">New to Pray Day (Latest)</div>
+            <div class="metric-value">{{ latest_newbies }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Newbies Details -->
+{% if newbies_details %}
+<div class="accordion mb-4" id="newbiesAccordion">
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNewbies">
+        New to Pray Day Details (By Date)
+      </button>
+    </h2>
+    <div id="collapseNewbies" class="accordion-collapse collapse" data-bs-parent="#newbiesAccordion">
+      <div class="accordion-body">
+        {% for date, table_html in newbies_details.items() %}
+            <h6 class="mt-3">{{ date }}</h6>
+            <div class="table-responsive">
+                {{ table_html|safe }}
+            </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Breakdown Table -->
+<h4 class="mb-3">Per Pray Day Breakdown</h4>
+{% if summary_table %}
+<div class="table-responsive bg-white p-3 rounded shadow-sm">
+    {{ summary_table|safe }}
+</div>
+<div class="mt-3">
+    <small class="text-muted">
+    <strong>Metric Explanations:</strong>
+    <ul>
+        <li><strong>Total Participants:</strong> Unique users who booked on this Pray Day.</li>
+        <li><strong>>1 Hour Participants:</strong> Users who prayed for more than 1 hour (aggregated) on this day.</li>
+        <li><strong>Done Pray Day Before:</strong> Users who had participated in at least one <em>previous</em> Pray Day.</li>
+        <li><strong>Done Regular Before:</strong> Users who have booked a slot on a non-Pray Day date <em>before</em> this Pray Day.</li>
+        <li><strong>New Users Retained:</strong> Users whose <em>first ever</em> booking was on this Pray Day, and who subsequently booked another slot on a later date.</li>
+        <li><strong>Total New Users:</strong> Users whose <em>first ever</em> booking was on this Pray Day.</li>
+    </ul>
+    </small>
+</div>
+{% else %}
+<div class="alert alert-info">No bookings found for the specified Pray Days.</div>
+{% endif %}
+
+{% endblock %}
