@@ -2,153 +2,109 @@
 
 {% block content %}
 <div class="mb-4">
-    <h1 class="h3">Administration & Configuration</h1>
+    <h1 class="h3">Administration</h1>
 </div>
 
 <div class="row">
-    <!-- Configuration -->
-    <div class="col-md-6 mb-4">
-        <div class="card shadow-sm border-0 h-100">
+    <!-- Pray Days Management -->
+    <div class="col-12 mb-4">
+        <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h5 class="card-title mb-3">Analysis Settings</h5>
-                <form action="{{ url_for('update_settings') }}" method="POST">
-                    <div class="mb-3">
-                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="include_gwop" name="include_gwop" {% if settings.include_gwop %}checked{% endif %}>
-                            <label class="form-check-label" for="include_gwop">Include 'gwop.csv' data</label>
-                        </div>
-                    </div>
+                <h5 class="card-title mb-3">Manage Pray Days</h5>
 
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label">Start Date</label>
-                            <input type="date" class="form-control" name="start_date" value="{{ settings.start_date }}">
-                        </div>
-                        <div class="col-6">
-                             <label class="form-label">End Date</label>
-                            <input type="date" class="form-control" name="end_date" value="{{ settings.end_date }}">
-                        </div>
+                <form action="{{ url_for('add_pray_day') }}" method="POST" class="row g-3 align-items-end mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" name="date" required>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Goal Percentage ({{ settings.goal_percentage }}%)</label>
-                        <input type="range" class="form-range" name="goal_percentage" min="0" max="100" step="5" value="{{ settings.goal_percentage }}">
+                    <div class="col-md-5">
+                        <label class="form-label">Label (Optional)</label>
+                        <input type="text" class="form-control" name="label" placeholder="e.g. Global Day">
                     </div>
-
-                    <hr>
-                    <h6 class="text-muted">Pray Day Config</h6>
-                    <div class="mb-3">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="exclude_gwop_new" name="exclude_gwop_new" {% if settings.exclude_gwop_new %}checked{% endif %}>
-                            <label class="form-check-label" for="exclude_gwop_new">Exclude GWOP from 'New' Logic</label>
-                        </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-success w-100">Add Pray Day</button>
                     </div>
-
-                    <button type="submit" class="btn btn-primary w-100">Update Settings</button>
                 </form>
+
+                <h6>Configured Days:</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for day in pray_days|sort(attribute='date') %}
+                    <form action="{{ url_for('delete_pray_day') }}" method="POST" class="d-inline">
+                        <input type="hidden" name="date" value="{{ day.date }}">
+                        <button type="submit" class="badge rounded-pill text-bg-light border p-2 text-decoration-none d-flex align-items-center gap-2" style="cursor: pointer;">
+                            {{ day.date }} {% if day.label %}- {{ day.label }}{% endif %}
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </form>
+                    {% else %}
+                    <p class="text-muted">No days configured.</p>
+                    {% endfor %}
+                </div>
+                <small class="text-muted mt-2 d-block">Click a day to remove it.</small>
             </div>
         </div>
     </div>
 
-    <!-- File Upload -->
-    <div class="col-md-6 mb-4">
+    <!-- Data Management Info (Read Only) -->
+    <div class="col-12 mb-4">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body">
-                <h5 class="card-title mb-3">Data Management</h5>
+                <h5 class="card-title mb-3">Data Tables (Read Only)</h5>
 
-                <h6 class="text-muted">Current Data (current.csv)</h6>
-                <form action="{{ url_for('upload_csv') }}" method="POST" enctype="multipart/form-data" class="mb-4">
-                    <div class="input-group">
-                        <input type="file" class="form-control" name="file" accept=".csv">
-                        <button class="btn btn-outline-secondary" type="submit">Upload</button>
-                    </div>
-                    <small class="text-muted">Replaces existing current.csv</small>
-                </form>
-
-                <hr>
-                <div class="accordion" id="dataAccordion">
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDupes">
-                                View Email Duplicates ({{ duplicates|length }})
-                            </button>
-                        </h2>
-                        <div id="collapseDupes" class="accordion-collapse collapse" data-bs-parent="#dataAccordion">
-                            <div class="accordion-body p-0">
-                                <table class="table table-sm table-striped mb-0" style="font-size: 0.8rem;">
-                                    <thead><tr><th>Additional</th><th>Primary</th></tr></thead>
-                                    <tbody>
-                                        {% for row in duplicates %}
-                                        <tr><td>{{ row.additional }}</td><td>{{ row.primary }}</td></tr>
-                                        {% else %}
-                                        <tr><td colspan="2">No duplicates found.</td></tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="accordion" id="dataAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDupes">
+                                        View Email Duplicates ({{ duplicates|length }})
+                                    </button>
+                                </h2>
+                                <div id="collapseDupes" class="accordion-collapse collapse" data-bs-parent="#dataAccordion">
+                                    <div class="accordion-body p-0">
+                                        <table class="table table-sm table-striped mb-0" style="font-size: 0.8rem;">
+                                            <thead><tr><th>Additional</th><th>Primary</th></tr></thead>
+                                            <tbody>
+                                                {% for row in duplicates %}
+                                                <tr><td>{{ row.additional }}</td><td>{{ row.primary }}</td></tr>
+                                                {% else %}
+                                                <tr><td colspan="2">No duplicates found.</td></tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                     <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMerges">
-                                View Person Merges ({{ merges|length }})
-                            </button>
-                        </h2>
-                        <div id="collapseMerges" class="accordion-collapse collapse" data-bs-parent="#dataAccordion">
-                            <div class="accordion-body p-0">
-                                <table class="table table-sm table-striped mb-0" style="font-size: 0.8rem;">
-                                    <thead><tr><th>Source</th><th>Target</th></tr></thead>
-                                    <tbody>
-                                        {% for row in merges %}
-                                        <tr><td>{{ row.source_key }}</td><td>{{ row.target_key }}</td></tr>
-                                        {% else %}
-                                        <tr><td colspan="2">No merges found.</td></tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                    <div class="col-md-6">
+                        <div class="accordion" id="dataAccordion2">
+                             <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMerges">
+                                        View Person Merges ({{ merges|length }})
+                                    </button>
+                                </h2>
+                                <div id="collapseMerges" class="accordion-collapse collapse" data-bs-parent="#dataAccordion2">
+                                    <div class="accordion-body p-0">
+                                        <table class="table table-sm table-striped mb-0" style="font-size: 0.8rem;">
+                                            <thead><tr><th>Source</th><th>Target</th></tr></thead>
+                                            <tbody>
+                                                {% for row in merges %}
+                                                <tr><td>{{ row.source_key }}</td><td>{{ row.target_key }}</td></tr>
+                                                {% else %}
+                                                <tr><td colspan="2">No merges found.</td></tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Pray Days Management -->
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-        <h5 class="card-title mb-3">Manage Pray Days</h5>
-
-        <form action="{{ url_for('add_pray_day') }}" method="POST" class="row g-3 align-items-end mb-4">
-            <div class="col-md-4">
-                <label class="form-label">Date</label>
-                <input type="date" class="form-control" name="date" required>
-            </div>
-            <div class="col-md-5">
-                <label class="form-label">Label (Optional)</label>
-                <input type="text" class="form-control" name="label" placeholder="e.g. Global Day">
-            </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-success w-100">Add Pray Day</button>
-            </div>
-        </form>
-
-        <h6>Configured Days:</h6>
-        <div class="d-flex flex-wrap gap-2">
-            {% for day in pray_days|sort(attribute='date') %}
-            <form action="{{ url_for('delete_pray_day') }}" method="POST" class="d-inline">
-                <input type="hidden" name="date" value="{{ day.date }}">
-                <button type="submit" class="badge rounded-pill text-bg-light border p-2 text-decoration-none d-flex align-items-center gap-2" style="cursor: pointer;">
-                    {{ day.date }} {% if day.label %}- {{ day.label }}{% endif %}
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </form>
-            {% else %}
-            <p class="text-muted">No days configured.</p>
-            {% endfor %}
-        </div>
-        <small class="text-muted mt-2 d-block">Click a day to remove it.</small>
     </div>
 </div>
 

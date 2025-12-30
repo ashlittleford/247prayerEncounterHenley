@@ -21,11 +21,34 @@
             background-color: #f8f9fa;
         }
 
-        .navbar-brand img {
-            height: 40px;
-            margin-right: 10px;
+        /* Sidebar Styling */
+        .sidebar {
+            background-color: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            min-height: 100vh;
+            padding-top: 1rem;
         }
 
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .sidebar-brand img {
+            max-width: 120px;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-brand h5 {
+            font-size: 1rem;
+            color: #333;
+        }
+
+        /* Metric Cards */
         .metric-card {
             background: white;
             border: none;
@@ -45,9 +68,30 @@
             color: #666;
         }
 
-        .nav-link.active {
+        /* Tabs Navigation */
+        .nav-tabs {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            color: #6c757d;
+            font-weight: 500;
+            padding: 1rem 1.5rem;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: #495057;
+            border: none;
+            background: transparent;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: #0d6efd;
+            border-bottom: 3px solid #0d6efd;
+            background: transparent;
             font-weight: bold;
-            color: #0d6efd !important;
         }
 
         .alert-warning {
@@ -63,54 +107,124 @@
                 flex: 0 0 50%;
                 max-width: 50%;
             }
+            .sidebar {
+                min-height: auto;
+                border-right: none;
+                border-bottom: 1px solid #dee2e6;
+                padding-bottom: 1rem;
+                margin-bottom: 1rem;
+            }
         }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('index') }}">
-      <img src="{{ url_for('static', filename='../logo.png') }}" alt="Logo">
-      Encounter Henley
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">General Analytics</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'pray_days' %}active{% endif %}" href="{{ url_for('pray_days') }}">Pray Days</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}" href="{{ url_for('admin') }}">Admin</a>
-        </li>
-      </ul>
+<div class="container-fluid">
+    <div class="row">
+        <!-- SIDEBAR -->
+        <div class="col-md-3 col-lg-2 sidebar p-3">
+            <div class="sidebar-brand">
+                <img src="{{ url_for('static', filename='../logo.png') }}" alt="Logo" class="img-fluid">
+                <h5>Encounter Henley</h5>
+            </div>
+
+            <!-- Data Management (Sidebar) -->
+            <div class="mb-4">
+                <h6 class="text-uppercase text-muted small fw-bold mb-3">Data Management</h6>
+
+                {% if last_updated %}
+                <div class="mb-3 small">
+                    <strong>current.csv last updated:</strong><br>
+                    {{ last_updated }}
+                </div>
+                {% else %}
+                <div class="alert alert-warning small p-2 mb-3">current.csv not found</div>
+                {% endif %}
+
+                <form action="{{ url_for('upload_csv') }}" method="POST" enctype="multipart/form-data" class="mb-2">
+                    <div class="mb-2">
+                        <label class="form-label small">Upload new current.csv</label>
+                        <input type="file" class="form-control form-control-sm" name="file" accept=".csv">
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary w-100" type="submit">Replace File</button>
+                </form>
+            </div>
+
+            <hr>
+
+            <!-- Configuration (Sidebar) -->
+            <div class="mb-4">
+                <h6 class="text-uppercase text-muted small fw-bold mb-3">Configuration</h6>
+
+                <form action="{{ url_for('update_settings') }}" method="POST">
+                    <div class="mb-3">
+                         <div class="form-check form-switch small">
+                            <input class="form-check-input" type="checkbox" id="include_gwop" name="include_gwop" {% if settings.include_gwop %}checked{% endif %}>
+                            <label class="form-check-label" for="include_gwop">Include 'gwop.csv'</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small">Date Range</label>
+                        <input type="date" class="form-control form-control-sm mb-2" name="start_date" value="{{ settings.start_date }}">
+                        <input type="date" class="form-control form-control-sm" name="end_date" value="{{ settings.end_date }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small">Goal Percentage ({{ settings.goal_percentage }}%)</label>
+                        <input type="range" class="form-range" name="goal_percentage" min="0" max="100" step="5" value="{{ settings.goal_percentage }}">
+                    </div>
+
+                    <!-- Moved from Admin: Pray Day Config (partial) -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch small">
+                            <input class="form-check-input" type="checkbox" id="exclude_gwop_new" name="exclude_gwop_new" {% if settings.exclude_gwop_new %}checked{% endif %}>
+                            <label class="form-check-label" for="exclude_gwop_new">Exclude GWOP from 'New' Logic</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Run Analysis</button>
+                </form>
+            </div>
+
+            <div class="mt-auto text-center small text-muted">
+                 &copy; 2025 Encounter Henley
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="col-md-9 col-lg-10 p-4">
+
+            <!-- Navigation Tabs -->
+            <ul class="nav nav-tabs">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">General Analytics</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'pray_days' %}active{% endif %}" href="{{ url_for('pray_days') }}">Pray Days Analytics</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}" href="{{ url_for('admin') }}">Admin</a>
+                </li>
+            </ul>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <!-- Page Content -->
+            {% block content %}{% endblock %}
+        </div>
     </div>
-  </div>
-</nav>
-
-<div class="container mt-4">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    {% block content %}{% endblock %}
 </div>
-
-<footer class="text-center py-4 text-muted border-top mt-5">
-    <small>&copy; 2025 Encounter Henley Prayer Room</small>
-</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

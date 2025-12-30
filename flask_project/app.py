@@ -32,6 +32,19 @@ def get_settings():
         'exclude_gwop_new': session.get('exclude_gwop_new', False)
     }
 
+@app.context_processor
+def inject_global_vars():
+    last_updated = "Unknown"
+    if os.path.exists("current_metadata.txt"):
+        with open("current_metadata.txt", "r") as f:
+            last_updated = f.read().strip()
+    elif os.path.exists("current.csv"):
+        # Fallback if metadata missing (e.g. first run)
+        ts = os.path.getmtime("current.csv")
+        last_updated = pd.to_datetime(ts, unit='s').strftime('%Y-%m-%d %H:%M:%S')
+
+    return dict(settings=get_settings(), last_updated=last_updated)
+
 def get_input_files(include_gwop):
     base = ["initial.csv", "current.csv", "prayday1.csv", "prayday2.csv", "prayday3.csv", "prayday4.csv"]
     if include_gwop:
@@ -198,27 +211,31 @@ def update_settings():
     session['include_gwop'] = 'include_gwop' in request.form
     session['exclude_gwop_new'] = 'exclude_gwop_new' in request.form
 
-    flash("Settings updated.", "success")
-    return redirect(url_for('admin')) # Or back to referrer
+    # flash("Settings updated.", "success")
+    return redirect(request.referrer or url_for('index'))
 
 @app.route('/upload-csv', methods=['POST'])
 def upload_csv():
     if 'file' not in request.files:
         flash('No file part', 'danger')
-        return redirect(url_for('admin'))
+        return redirect(request.referrer or url_for('index'))
     file = request.files['file']
     if file.filename == '':
         flash('No selected file', 'danger')
-        return redirect(url_for('admin'))
+        return redirect(request.referrer or url_for('index'))
 
     # Save as current.csv
     try:
         file.save("current.csv")
+        # Update timestamp file
+        with open("current_metadata.txt", "w") as f:
+            now_adelaide = pd.Timestamp.now(tz='Australia/Adelaide').strftime('%Y-%m-%d %H:%M:%S')
+            f.write(now_adelaide)
         flash("current.csv successfully updated!", "success")
     except Exception as e:
         flash(f"Error saving file: {e}", "danger")
 
-    return redirect(url_for('admin'))
+    return redirect(request.referrer or url_for('index'))
 
 @app.route('/add-pray-day', methods=['POST'])
 def add_pray_day():
