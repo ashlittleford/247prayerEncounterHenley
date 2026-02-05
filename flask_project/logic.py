@@ -92,30 +92,13 @@ def run_full_analysis(input_files, outdir, start_date, end_date, goal_percentage
     today = pd.Timestamp.now().normalize()
     data_min_date = df_unfiltered["start_time"].min().normalize()
 
-    # Load email duplicates
-    email_dupes_path = "email_duplicates.csv"
-    email_map = {}
-    if os.path.exists(email_dupes_path):
-        email_dupes_df = pd.read_csv(email_dupes_path)
-        for _, row in email_dupes_df.iterrows():
-            primary_email = str(row["primary"] or "").strip().lower()
-            additional_email = str(row["additional"] or "").strip().lower()
-            if primary_email and additional_email:
-                email_map[additional_email] = primary_email
-
-    # Load person merges
-    merge_map = {}
-    person_merges_path = "person_merges.csv"
-    if os.path.exists(person_merges_path):
-        try:
-            pm_df = pd.read_csv(person_merges_path)
-            for _, row in pm_df.iterrows():
-                 src = str(row["source_key"] or "").strip()
-                 tgt = str(row["target_key"] or "").strip()
-                 if src and tgt:
-                     merge_map[src] = tgt
-        except Exception as e:
-            print(f"Error loading person_merges.csv: {e}")
+    # Load email duplicates and person merges using utility functions
+    email_map = pal.create_email_map()
+    try:
+        merge_map = pal.create_merge_map()
+    except Exception as e:
+        print(f"Error loading person_merges.csv: {e}")
+        merge_map = {}
 
     # Apply keys and calculate hours on the UNFILTERED data
     df_unfiltered["person_key"] = df_unfiltered.apply(pal.make_person_key, axis=1, args=(email_map,))

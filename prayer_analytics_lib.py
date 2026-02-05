@@ -545,15 +545,7 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     # ----------------------------------------------------
     
     # Load email duplicates and create a lookup map
-    email_dupes_path = "email_duplicates.csv"
-    email_map = {}
-    if os.path.exists(email_dupes_path):
-        email_dupes_df = pd.read_csv(email_dupes_path)
-        for _, row in email_dupes_df.iterrows():
-            primary_email = str(row["primary"] or "").strip().lower()
-            additional_email = str(row["additional"] or "").strip().lower()
-            if primary_email and additional_email:
-                email_map[additional_email] = primary_email
+    email_map = create_email_map()
 
     df["person_key"] = df.apply(make_person_key, axis=1, args=(email_map,))
     df["person_name"] = df.apply(
@@ -912,3 +904,37 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
         "newbies_details": newbies_details_map,
         "breakdown_details": breakdown_details_df
     }
+
+
+def create_email_map(filepath="email_duplicates.csv"):
+    """
+    Loads email duplicates and creates a lookup map for primary emails.
+    """
+    if not os.path.exists(filepath):
+        return {}
+
+    df = pd.read_csv(filepath)
+    df.dropna(subset=['primary', 'additional'], inplace=True)
+
+    primary_emails = df['primary'].astype(str).str.strip().str.lower()
+    additional_emails = df['additional'].astype(str).str.strip().str.lower()
+
+    return dict(zip(additional_emails, primary_emails))
+
+
+def create_merge_map(filepath="person_merges.csv"):
+    """
+    Loads person merges and creates a lookup map for merging person keys.
+    Raises:
+        Exception: If the file cannot be read or processed.
+    """
+    if not os.path.exists(filepath):
+        return {}
+
+    df = pd.read_csv(filepath)
+    df.dropna(subset=['source_key', 'target_key'], inplace=True)
+
+    source_keys = df['source_key'].astype(str).str.strip()
+    target_keys = df['target_key'].astype(str).str.strip()
+
+    return dict(zip(source_keys, target_keys))
