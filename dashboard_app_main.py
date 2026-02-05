@@ -261,27 +261,14 @@ def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percen
     today = pd.Timestamp.now().normalize()
     data_min_date = df_unfiltered["start_time"].min().normalize()
 
-    # Load email duplicates and create a lookup map
-    email_dupes_path = "email_duplicates.csv"
-    email_map = {}
-    if os.path.exists(email_dupes_path):
-        email_dupes_df = pd.read_csv(email_dupes_path)
-        for _, row in email_dupes_df.iterrows():
-            primary_email = str(row["primary"] or "").strip().lower()
-            additional_email = str(row["additional"] or "").strip().lower()
-            if primary_email and additional_email:
-                email_map[additional_email] = primary_email
+    # Load email duplicates and person merges using utility functions
+    email_map = pal.create_email_map()
 
-    # Load person merges
-    merge_map = {}
-    person_merges_path = "person_merges.csv"
-    if os.path.exists(person_merges_path):
-        pm_df = pd.read_csv(person_merges_path)
-        for _, row in pm_df.iterrows():
-             src = str(row["source_key"] or "").strip()
-             tgt = str(row["target_key"] or "").strip()
-             if src and tgt:
-                 merge_map[src] = tgt
+    try:
+        merge_map = pal.create_merge_map()
+    except Exception as e:
+        st.warning(f"Error loading person_merges.csv: {e}")
+        merge_map = {}
 
     # Apply keys and calculate hours on the UNFILTERED data
     df_unfiltered["person_key"] = df_unfiltered.apply(pal.make_person_key, axis=1, args=(email_map,))
@@ -289,25 +276,6 @@ def run_full_analysis(input_files, outdir, start_filter, end_filter, goal_percen
     # Apply merges
     if merge_map:
         df_unfiltered["person_key"] = df_unfiltered["person_key"].replace(merge_map)
-
-    # Apply keys
-    df_unfiltered["person_key"] = df_unfiltered.apply(pal.make_person_key, axis=1, args=(email_map,))
-
-    # Apply Key Merges (Overrides)
-    person_merges_path = "person_merges.csv"
-    if os.path.exists(person_merges_path):
-        try:
-            merges_df = pd.read_csv(person_merges_path)
-            # Create a dictionary for mapping source_key -> target_key
-            merge_map = {}
-            for _, row in merges_df.iterrows():
-                if pd.notna(row['source_key']) and pd.notna(row['target_key']):
-                    merge_map[row['source_key'].strip()] = row['target_key'].strip()
-
-            if merge_map:
-                df_unfiltered["person_key"] = df_unfiltered["person_key"].replace(merge_map)
-        except Exception as e:
-            st.warning(f"Error loading person_merges.csv: {e}")
 
     # Calculate hours on the UNFILTERED data
     df_unfiltered["person_name"] = df_unfiltered.apply(
