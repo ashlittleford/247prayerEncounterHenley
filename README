@@ -1,3 +1,29 @@
-current.csv last pulled: 06/12/2025
+# Encounter Henley Prayer Room Insights
 
+This repository contains the codebase for the Prayer Room Insights dashboard. It provides analytics on prayer sessions, user participation, and specific "Pray Day" events.
+
+## Accessing the Dashboard
+
+The dashboard is accessible online at: [https://prayerstats.encounteradelaide.com.au](https://prayerstats.encounteradelaide.com.au)
+
+## Documentation
+
+-   **Deployment & Usage:** See [DEPLOYMENT.md](DEPLOYMENT.md) for instructions on how to access the live site, upload data, and deploy updates.
+-   **Flask Application:** An alternative Flask implementation is located in the `flask_project/` directory. See `flask_project/README.md` for details.
+
+## Quick Start (Local Development)
+
+To run the Streamlit application locally:
+
+```bash
+pip install -r requirements.txt
 python -m streamlit run dashboard_app.py
+```
+
+## Project Structure
+
+-   `dashboard_app.py`: The main Streamlit application source code.
+-   `prayer_analytics_lib.py`: Core library containing data processing and analysis logic.
+-   `flask_project/`: Directory containing the Flask implementation.
+-   `gwop.csv`, `current.csv`: Data files used for analysis.
+-   `passenger_wsgi.py`: Entry point for cPanel/Passenger deployment.
