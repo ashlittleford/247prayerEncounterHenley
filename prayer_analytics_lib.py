@@ -68,7 +68,7 @@ def make_person_key(row, email_map):
     last = str(row["lastname"] or "").strip().lower()
     email = str(row["email"] or "").replace(" ", "").strip().lower()
     mobile = str(row["mobile"] or "").replace(" ", "").strip()
-    
+
     # Use the email map to standardize the email address
     if email in email_map:
         email = email_map[email]
@@ -106,7 +106,7 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     # --- OVERVIEW ---
     total_hours = df["duration"].sum()
     total_users = df["person_key"].nunique()
-    
+
     df["weekday"] = df["start_time"].dt.day_name()
     df["hour"] = df["start_time"].dt.hour
     popular_slots = df.groupby(["weekday", "hour"]).size().sort_values(ascending=False).head(3)
@@ -132,19 +132,19 @@ def calculate_dashboard_metrics(df, df_monthly_total):
 
     # --- RECENTLY ---
     today_ts = pd.Timestamp.now().normalize()
-    
+
     # 7-Day Periods
     last_7_days_start = today_ts - timedelta(days=7)
     prev_7_days_start = today_ts - timedelta(days=14)
-    
+
     df_last_7 = df[(df["start_time"] >= last_7_days_start) & (df["start_time"] < today_ts)]
     df_prev_7 = df[(df["start_time"] >= prev_7_days_start) & (df["start_time"] < last_7_days_start)]
-    
+
     hours_last_7 = df_last_7["duration"].sum()
     hours_prev_7 = df_prev_7["duration"].sum()
     users_last_7 = df_last_7["person_key"].nunique()
     users_prev_7 = df_prev_7["person_key"].nunique()
-    
+
     total_possible_hours_7 = 7 * 24
     pct_last_7 = (hours_last_7 / total_possible_hours_7) * 100 if total_possible_hours_7 > 0 else 0
     pct_prev_7 = (hours_prev_7 / total_possible_hours_7) * 100 if total_possible_hours_7 > 0 else 0
@@ -152,11 +152,11 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     # 28-Day Periods (4 Weeks)
     last_28_days_start = today_ts - timedelta(days=28)
     prev_28_days_start = today_ts - timedelta(days=56)
-    
+
     # Filter dataframes for the actual 28-day periods
     df_last_28 = df[(df["start_time"] >= last_28_days_start) & (df["start_time"] < today_ts)]
     df_prev_28 = df[(df["start_time"] >= prev_28_days_start) & (df["start_time"] < last_28_days_start)]
-    
+
     hours_last_28 = df_last_28["duration"].sum()
     hours_prev_28 = df_prev_28["duration"].sum()
     users_last_28 = df_last_28["person_key"].nunique()
@@ -167,16 +167,16 @@ def calculate_dashboard_metrics(df, df_monthly_total):
 
     pct_last_28 = (hours_last_28 / total_possible_hours_28) * 100 if total_possible_hours_28 > 0 else 0
     pct_prev_28 = (hours_prev_28 / total_possible_hours_28) * 100 if total_possible_hours_28 > 0 else 0
-    
+
     # --- Add Metrics to List ---
-    
+
     metrics.append({"Metric": "Total Hours Last 7 Days", "Value": f"{hours_last_7:.2f}"})
     metrics.append({"Metric": "Unique Users Last 7 Days", "Value": f"{users_last_7}"})
     metrics.append({"Metric": "Total Hours Previous 7 Days", "Value": f"{hours_prev_7:.2f}"})
     metrics.append({"Metric": "Unique Users Previous 7 Days", "Value": f"{users_prev_7}"})
     metrics.append({"Metric": "Last 7 Days Hours Filled (%)", "Value": f"{pct_last_7:.2f}%"})
     metrics.append({"Metric": "Previous 7 Days Hours Filled (%)", "Value": f"{pct_prev_7:.2f}%"})
-    
+
     # 28-day metrics
     metrics.append({"Metric": "Total Hours Last 28 Days", "Value": f"{hours_last_28:.2f}"})
     metrics.append({"Metric": "Unique Users Last 28 Days", "Value": f"{users_last_28}"})
@@ -184,19 +184,19 @@ def calculate_dashboard_metrics(df, df_monthly_total):
     metrics.append({"Metric": "Unique Users Previous 28 Days", "Value": f"{users_prev_28}"})
     metrics.append({"Metric": "Last 28 Days Hours Filled (%)", "Value": f"{pct_last_28:.2f}%"})
     metrics.append({"Metric": "Previous 28 Days Hours Filled (%)", "Value": f"{pct_prev_28:.2f}%"})
-    
+
     return metrics
 
 def export_user_summary_to_csv(df, outdir):
     """Exports a summary of users with their personal details and weekly/fortnightly average hours.
     (Keeps: firstname, lastname, mobile, email columns)."""
-    
+
     start_date = df["start_time"].min().date()
     today = pd.Timestamp.now().normalize().date()
     total_days = (today - start_date).days + 1
     total_weeks = total_days / 7
     total_fortnights = total_days / 14
-    
+
     # 1. Aggregate user details and total hours (using 'first' to grab one representative detail)
     user_agg = df.groupby("person_key").agg(
         firstname=("firstname", "first"),
@@ -214,17 +214,17 @@ def export_user_summary_to_csv(df, outdir):
 
     user_summary["weekly_avg_hours"] = user_summary["total_hours"] / total_weeks if total_weeks > 0 else 0
     user_summary["fortnightly_avg_hours"] = user_summary["total_hours"] / total_fortnights if total_fortnights > 0 else 0
-    
+
     # Format to 2 decimal places before saving
     user_summary[["weekly_avg_hours", "fortnightly_avg_hours"]] = user_summary[["weekly_avg_hours", "fortnightly_avg_hours"]].round(2)
-    
+
     # Export with new columns
     user_summary[[
-        "firstname", "lastname", "mobile", "email", 
-        "person_key", "person_name", 
+        "firstname", "lastname", "mobile", "email",
+        "person_key", "person_name",
         "weekly_avg_hours", "fortnightly_avg_hours"
     ]].to_csv(os.path.join(outdir, "user.csv"), index=False)
-    
+
     return user_summary
 
 def calculate_regulars_metrics(df, user_summary, outdir):
@@ -232,16 +232,16 @@ def calculate_regulars_metrics(df, user_summary, outdir):
     # Define regulars based on new logic
     weekly_regulars = user_summary[user_summary["weekly_avg_hours"] >= 1]["person_key"].tolist()
     fortnightly_regulars = user_summary[user_summary["fortnightly_avg_hours"] >= 1]["person_key"].tolist()
-    
+
     # Calculate percentages
     total_hours = df["duration"].sum()
     pct_weekly_hours = (df[df["person_key"].isin(weekly_regulars)]["duration"].sum() / total_hours) * 100 if total_hours > 0 else 0
     pct_fortnightly_hours = (df[df["person_key"].isin(fortnightly_regulars)]["duration"].sum() / total_hours) * 100 if total_hours > 0 else 0
-    
+
     # Export CSVs with formatted values
     user_summary[user_summary["person_key"].isin(weekly_regulars)].round(2).to_csv(os.path.join(outdir, "weekly_regulars.csv"), index=False)
     user_summary[user_summary["person_key"].isin(fortnightly_regulars)].round(2).to_csv(os.path.join(outdir, "fortnightly_regulars.csv"), index=False)
-    
+
     metrics = []
     metrics.append({"Metric": "Number of Weekly Regulars", "Value": len(weekly_regulars)})
     metrics.append({"Metric": "Total Hours by Weekly Regulars (%)", "Value": f"{pct_weekly_hours:.2f}%"})
@@ -251,13 +251,13 @@ def calculate_regulars_metrics(df, user_summary, outdir):
 
 def export_top_10_slots(df, outdir):
     """Exports the top 10 most booked prayer slots based on total raw bookings/entries."""
-    
+
     df["weekday"] = df["start_time"].dt.day_name()
     df["hour"] = df["start_time"].dt.hour
-    
+
     # 1. Count the total number of bookings for each slot (using the full dataframe)
     top_slots_count = df.groupby(["weekday", "hour"]).size().reset_index(name="total_bookings")
-    
+
     # 2. Sort by count and take top 10
     top_10 = top_slots_count.sort_values("total_bookings", ascending=False).head(10)
 
@@ -269,28 +269,28 @@ def export_weekly_likelihood_metrics(df, outdir):
     Calculates and exports the top 3 slots for two likelihood metrics, one being a probability distribution
     over all 168 slots (7 days * 24 hours).
     """
-    
+
     # Calculate Total Weeks in the dataset (Denominator for Metric 1)
     start_date = df["start_time"].min().normalize()
     end_date = df["start_time"].max().normalize()
     total_weeks = max(1.0, (end_date - start_date).days / 7)
-    
+
     df["weekday"] = df["start_time"].dt.day_name()
     df["hour"] = df["start_time"].dt.hour
-    
+
     # -----------------------------------------------
     # Metric 1: Top 3 slots Avg Bookings per Week (Volume)
     # -----------------------------------------------
-    
+
     # 1. Count total bookings per slot (Weekday + Hour)
     total_bookings_per_slot = df.groupby(["weekday", "hour"]).size().reset_index(name="total_bookings")
-    
+
     # 2. Calculate average weekly bookings
     total_bookings_per_slot["weekly_avg_bookings"] = total_bookings_per_slot["total_bookings"] / total_weeks
-    
+
     # 3. Rank and take top 3
     top_3_total = total_bookings_per_slot.sort_values("weekly_avg_bookings", ascending=False).head(3)
-    
+
     top_3_total = top_3_total.rename(columns={"weekly_avg_bookings": "Likelihood Value"})
     top_3_total["Metric"] = "Top 3 - Avg Bookings per Week (Volume)"
     top_3_total = top_3_total[["Metric", "weekday", "hour", "Likelihood Value"]]
@@ -299,7 +299,7 @@ def export_weekly_likelihood_metrics(df, outdir):
     # -----------------------------------------------
     # Metric 2: Slot Selection Probability (Unique User Choice) - All 168 slots sum to 1
     # -----------------------------------------------
-    
+
     # 1. Filter: Get unique user selection for a slot (Person + Weekday + Hour)
     df_unique_choice = df.drop_duplicates(subset=["person_key", "weekday", "hour"])
 
@@ -318,30 +318,30 @@ def export_weekly_likelihood_metrics(df, outdir):
     slot_probability = all_slots.merge(slot_count, on=['weekday', 'hour'], how='left').fillna(0)
     slot_probability["unique_user_count"] = slot_probability["unique_user_count"].astype(int)
     slot_probability["Probability"] = slot_probability["unique_user_count"] / total_unique_choices
-    
+
     # Export the full 168-slot probability table
     full_probability_df = slot_probability[["weekday", "hour", "Probability"]].sort_values(by=["Probability", "weekday", "hour"], ascending=[False, True, True])
     full_probability_df.to_csv(os.path.join(outdir, "unique_user_slot_probability.csv"), index=False)
 
     # Extract Top 3 from the full probability table for the comparison CSV
     top_3_probability = slot_probability.sort_values("Probability", ascending=False).head(3)
-    
+
     top_3_probability = top_3_probability.rename(columns={"Probability": "Likelihood Value"})
     top_3_probability["Metric"] = "Top 3 - Slot Selection Probability (Unique User)"
     top_3_probability = top_3_probability[["Metric", "weekday", "hour", "Likelihood Value"]]
-    
-    
+
+
     # -----------------------------------------------
     # Combine Top 3s and Export (for comparison)
     # -----------------------------------------------
-    
+
     combined_top_slots = pd.concat([top_3_total, top_3_probability], ignore_index=True)
-    
+
     # Format value column to 4 decimal places for probability
     combined_top_slots["Likelihood Value"] = combined_top_slots["Likelihood Value"].round(4)
-        
+
     combined_top_slots.to_csv(os.path.join(outdir, "weekly_slot_likelihood.csv"), index=False)
-    
+
     return combined_top_slots
 
 
@@ -380,14 +380,14 @@ def plot_binary_hourly_distribution(df, outdir):
 def plot_weekly_total_hours(df, outdir, goal_percentage):
     """Creates a line graph of the weekly total hours with a dynamic goal line (or no line if goal_percentage is None)."""
     df_weekly_total = df.groupby(pd.Grouper(key="start_time", freq="W"))["duration"].sum().reset_index()
-    
+
     plt.figure(figsize=(10, 5))
     plt.plot(df_weekly_total["start_time"], df_weekly_total["duration"], marker='o')
     plt.title("Total Hours Logged per Week")
     plt.xlabel("Week Starting")
     plt.ylabel("Total Hours")
     plt.grid(True)
-    
+
     ax = plt.gca()
 
     # --- Conditional Goal Line Logic ---
@@ -397,11 +397,11 @@ def plot_weekly_total_hours(df, outdir, goal_percentage):
         # Add a red dashed horizontal line at the goal percentage mark
         ax.axhline(y=weekly_goal_hours, color='red', linestyle='--', label=f'{goal_percentage}% Goal ({weekly_goal_hours:.1f} hrs)')
         ax.legend()
-    
+
     # Set the x-axis to show a label for every second week to improve readability
     ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d, %Y'))
-    
+
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
     plt.savefig(os.path.join(outdir, "weekly_total_hours.png"))
@@ -410,10 +410,10 @@ def plot_weekly_total_hours(df, outdir, goal_percentage):
 def plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage):
     """Creates a line graph of the monthly total hours with a dynamic goal line (or no line if goal_percentage is None)."""
     df_monthly_total = df_monthly_total.reset_index()
-    
+
     # Corrected: Use 'start_time' column for formatting the month
     df_monthly_total["month"] = df_monthly_total["start_time"].dt.strftime('%b %Y')
-    
+
     plt.figure(figsize=(10, 5))
     plt.plot(df_monthly_total["month"], df_monthly_total["duration"], marker='o')
     plt.title("Total Hours Logged per Month")
@@ -421,7 +421,7 @@ def plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage):
     plt.ylabel("Total Hours")
     plt.xticks(rotation=45)
     plt.grid(True)
-    
+
     ax = plt.gca()
 
     # --- Conditional Goal Line Logic ---
@@ -438,12 +438,12 @@ def plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage):
 
 def plot_avg_hours_distribution(user_summary, outdir):
     """Plots the weekly average hours for each user on a bar chart."""
-    
+
     # Sort users by weekly average for a meaningful plot
     weekly_sorted = user_summary.sort_values("weekly_avg_hours", ascending=False)
-    
+
     fig, ax = plt.subplots(figsize=(15, 7))
-    
+
     # Weekly Average Bar Chart
     weekly_sorted.plot(x="person_name", y="weekly_avg_hours", kind="bar", ax=ax, color='skyblue', legend=False)
     ax.set_title("Weekly Average Hours per User")
@@ -451,7 +451,7 @@ def plot_avg_hours_distribution(user_summary, outdir):
     ax.set_ylabel("Weekly Average Hours")
     ax.tick_params(axis='x', rotation=90)
     ax.grid(axis='y')
-    
+
     plt.tight_layout()
     plt.savefig(os.path.join(outdir, "avg_hours_distribution.png"))
     plt.close()
@@ -459,27 +459,27 @@ def plot_avg_hours_distribution(user_summary, outdir):
 def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_percentage=10):
     """
     Runs the entire analysis process.
-    
+
     :param start_filter: Optional. A string representing the start date (e.g., "2024-01-01") or a year (e.g., "2024").
     :param end_filter: Optional. A string representing the end date (e.g., "2024-12-31") or a year (e.g., "2024").
     :param goal_percentage: The target percentage for weekly/monthly hours for goal lines on charts. Pass None to disable the line.
     """
-    
+
     # ----------------------------------------------------
     # 1. LOAD, NORMALIZE, AND FILTER DATA
     # ----------------------------------------------------
     df = load_and_combine_csvs(input_files)
     df = normalize_columns(df)
-    
+
     today = pd.Timestamp.now().normalize()
-    
+
     # Determine overall min/max dates from raw data
     data_min_date = df["start_time"].min().normalize()
-    
+
     # Set default filter dates: start from min data date, end today
     filter_start_date = data_min_date
     filter_end_date = today
-    
+
     # Process start_filter input
     if start_filter:
         try:
@@ -499,7 +499,7 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
         except Exception:
             # Fallback silently if an unexpected error occurs
             filter_start_date = data_min_date
-            
+
     # Process end_filter input
     if end_filter:
         try:
@@ -521,21 +521,21 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     if filter_start_date > filter_end_date:
         # Warning print removed
         filter_start_date, filter_end_date = filter_end_date, filter_start_date
-        
+
     # --- Update OUTDIR to include the analysed date range ---
     date_range_str = f"_{filter_start_date.strftime('%Y%m%d')}_to_{filter_end_date.strftime('%Y%m%d')}"
     final_outdir = outdir.rstrip("/\\") + date_range_str
-    
+
     # Apply filtering
     df = df[(df["start_time"].dt.normalize() >= filter_start_date) & (df["start_time"].dt.normalize() <= filter_end_date)]
-    
+
     if df.empty:
         raise ValueError(f"No data found between {filter_start_date.strftime('%Y-%m-%d')} and {filter_end_date.strftime('%Y-%m-%d')}. Analysis aborted.")
-        
+
     # Reassign outdir to the date-specific folder and create it
     outdir = final_outdir
     os.makedirs(outdir, exist_ok=True)
-    
+
     # Drop NaNs and ensure data is before 'today' (which is the upper bound of the filter)
     df = df[df["start_time"] <= today]
     df = df.dropna(subset=["start_time", "end_time"])
@@ -543,9 +543,17 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
     # ----------------------------------------------------
     # 2. RUN ANALYSIS
     # ----------------------------------------------------
-    
+
     # Load email duplicates and create a lookup map
-    email_map = create_email_map()
+    email_dupes_path = "email_duplicates.csv"
+    email_map = {}
+    if os.path.exists(email_dupes_path):
+        email_dupes_df = pd.read_csv(email_dupes_path)
+        for _, row in email_dupes_df.iterrows():
+            primary_email = str(row["primary"] or "").strip().lower()
+            additional_email = str(row["additional"] or "").strip().lower()
+            if primary_email and additional_email:
+                email_map[additional_email] = primary_email
 
     df["person_key"] = df.apply(make_person_key, axis=1, args=(email_map,))
     df["person_name"] = df.apply(
@@ -555,26 +563,26 @@ def run_analysis(input_files, outdir, start_filter=None, end_filter=None, goal_p
         axis=1,
     )
     df = calculate_hours(df)
-    
+
     check_short_sessions(df)
-    
+
     # Group by month start for plotting purposes
     df_monthly_total = df.groupby(pd.Grouper(key="start_time", freq="MS"))["duration"].sum()
 
     metrics = calculate_dashboard_metrics(df, df_monthly_total)
-    
+
     user_summary = export_user_summary_to_csv(df, outdir)
     regular_metrics = calculate_regulars_metrics(df, user_summary, outdir)
-    
+
     all_metrics = metrics + regular_metrics
     metrics_df = pd.DataFrame(all_metrics)
     metrics_df.to_csv(os.path.join(outdir, "dashboard_summary.csv"), index=False)
-      
+
     export_top_10_slots(df, outdir)
     export_weekly_likelihood_metrics(df, outdir)
     plot_hourly_distribution(df, outdir)
     plot_binary_hourly_distribution(df, outdir)
-    
+
     # Call plotting functions with goal_percentage
     plot_weekly_total_hours(df, outdir, goal_percentage)
     plot_monthly_total_hours(df_monthly_total, outdir, goal_percentage)
@@ -588,15 +596,15 @@ def calculate_time_period_stats(df, days):
     today = pd.Timestamp.now().normalize()
     end_current = today + timedelta(days=1) # up to the start of today
     start_current = end_current - timedelta(days=days)
-    
+
     start_previous = start_current - timedelta(days=days)
     end_previous = start_current
-    
+
     # Filter for current period
     df_current = df[(df["start_time"] >= start_current) & (df["start_time"] < end_current)]
     current_hours = df_current["duration"].sum().round(2)
     current_unique_users = df_current["person_key"].nunique()
-    
+
     # Filter for previous period
     df_previous = df[(df["start_time"] >= start_previous) & (df["start_time"] < end_previous)]
     previous_hours = df_previous["duration"].sum().round(2)
@@ -608,7 +616,7 @@ def calculate_time_period_stats(df, days):
         change_pct = 100.0 # From zero to a positive number
     else:
         change_pct = 0.0
-        
+
     return current_hours, current_unique_users, change_pct
 
 def calculate_fortnightly_regulars_metrics(df, user_summary, outdir):
@@ -619,7 +627,7 @@ def calculate_fortnightly_regulars_metrics(df, user_summary, outdir):
     total_days = (df["start_time"].max().normalize() - df["start_time"].min().normalize()).days
     if total_days < 14:
         # If the total duration is less than 14 days, base the calculation on 14 days.
-        fortnight_count = 1 
+        fortnight_count = 1
     else:
         # Calculate the number of full fortnight periods in the data
         fortnight_count = max(1, total_days / 14)
@@ -634,7 +642,7 @@ def calculate_fortnightly_regulars_metrics(df, user_summary, outdir):
     # Calculate hours contributed by fortnight regulars
     hours_by_fortnight_regulars = fortnight_regulars_df["total_hours"].sum()
     total_hours = user_summary["total_hours"].sum()
-    
+
     hours_pct = (hours_by_fortnight_regulars / total_hours) * 100 if total_hours > 0 else 0
 
     return [
@@ -652,19 +660,19 @@ def calculate_average_metrics(df):
     """Calculates average hours per week/month based on the filtered data period."""
     if df.empty:
         return []
-    
+
     data_min_date = df["start_time"].min().normalize()
     data_max_date = df["start_time"].max().normalize()
     total_days = (data_max_date - data_min_date).days + 1
-    
+
     if total_days == 0:
         return []
 
     total_hours = df["duration"].sum()
-    
+
     # Calculate average hours per calendar week (7 days)
     avg_hours_per_week = (total_hours / total_days) * 7
-    
+
     # Calculate average hours per calendar month (approx 30.44 days)
     avg_hours_per_month = (total_hours / total_days) * 30.44
 
@@ -904,7 +912,6 @@ def analyze_pray_days(df, pray_day_dates, exclude_gwop_from_new_logic=False):
         "newbies_details": newbies_details_map,
         "breakdown_details": breakdown_details_df
     }
-
 
 def create_email_map(filepath="email_duplicates.csv"):
     """
