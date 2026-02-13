@@ -1,12 +1,23 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, session
 import os
+import sys
+
+# Ensure CWD is set correctly
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Set MPLCONFIGDIR to avoid permission issues
+os.environ['MPLCONFIGDIR'] = '/tmp'
+
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, session
 import pandas as pd
-import logic
-import prayer_analytics_lib as pal
 import matplotlib
+
 # Set backend to Agg before importing pyplot to avoid GUI errors
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+# Import logic libraries AFTER configuring matplotlib
+import logic
+import prayer_analytics_lib as pal
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24) # Secure random key for session
