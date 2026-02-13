@@ -21,11 +21,26 @@ This guide explains how to set up the application from scratch on cPanel with th
     *   **Entry Point:** `application` (this is the default).
 3.  **Click Create.**
 
-## 3. Configure Dependencies
+## 3. Configure Dependencies (CRITICAL STEP)
 
-1.  Once created, scroll down to the "Configuration files" section.
+The most common error is using Python 2.7 by mistake. You must use the Python Virtual Environment created by cPanel.
+
+**Option A: Using the cPanel Interface (Easiest)**
+1.  In the "Setup Python App" page, scroll down to "Configuration files".
 2.  Type `requirements.txt` and click **Add**.
-3.  Click **Run Pip Install** to install Flask, Pandas, etc.
+3.  Click **Run Pip Install**.
+    *   *If this fails or does nothing, try Option B.*
+
+**Option B: Using the Terminal (More Reliable)**
+1.  Copy the "Command for entering to virtual environment" from the top of the "Setup Python App" page.
+    *   It looks like: `source /home/encosnpm/virtualenv/247prayer/3.9/bin/activate && cd /home/encosnpm/247prayer`
+2.  Paste that command into your terminal and press Enter.
+    *   Your prompt should change to start with `(247prayer:3.9)`.
+3.  Now run the install command:
+    ```bash
+    pip install -r requirements.txt
+    ```
+    *   *Note: If you are NOT in the virtual environment, you must use `pip3` or `python3 -m pip` instead of just `pip`.*
 
 ## 4. Final Verification
 
