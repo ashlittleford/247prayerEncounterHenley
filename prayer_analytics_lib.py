@@ -11,8 +11,8 @@ import sys
 # Font Setup for Matplotlib
 # -----------------------
 # Register fonts
-font_path_regular = os.path.join("fonts", "Montserrat-Regular.ttf")
-font_path_bold = os.path.join("fonts", "Montserrat-Bold.ttf")
+font_path_regular = os.path.join("static", "fonts", "Montserrat-Regular.ttf")
+font_path_bold = os.path.join("static", "fonts", "Montserrat-Bold.ttf")
 
 if os.path.exists(font_path_regular):
     fm.fontManager.addfont(font_path_regular)
