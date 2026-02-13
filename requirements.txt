@@ -1,4 +1,6 @@
-streamlit
+Flask
 pandas
 numpy
 matplotlib
+gunicorn
+python-dotenv
