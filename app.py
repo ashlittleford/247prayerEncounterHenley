@@ -51,6 +51,10 @@ def get_input_files(include_gwop):
         base.append("gwop.csv")
     return [f for f in base if os.path.exists(f)]
 
+@app.route('/test')
+def test_app():
+    return "<h1>Flask App is Running!</h1>"
+
 @app.route('/')
 def index():
     settings = get_settings()

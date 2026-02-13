@@ -1,6 +1,0 @@
-Flask==3.0.0
-pandas>=1.5.0
-numpy
-matplotlib
-gunicorn
-python-dotenv
