@@ -51,3 +51,34 @@ Try visiting: `your-url/test` (e.g., `encounteradelaide.com.au/prayerinsights/te
 
 ### 4. "500 Internal Server Error"
 - Check the `stderr.log` file in the root directory for Python error details.
+
+### 5. GLOBAL OUTAGE: All Python Sites Down / Giving 404
+If multiple Python websites hosted on the same server suddenly stop working and show 404 errors, this indicates a server-level configuration issue.
+
+**Likely Causes:**
+1.  **cPanel Configuration Reset:** The "Setup Python App" configuration might have been lost or corrupted during a server update.
+2.  **Web Server Configuration Change:** The `.htaccess` file handling routing to Python apps might have been overwritten or deleted.
+3.  **Python Version Change:** The system Python version might have been updated, breaking existing virtual environments.
+
+**Steps to Fix:**
+1.  **Check "Setup Python App" in cPanel:**
+    - Log in to cPanel.
+    - Go to "Setup Python App".
+    - Verify that your applications are listed there.
+    - If they are missing, you must recreate them (see "Setup Python App in cPanel" in `START_OVER_GUIDE.md`).
+    - If they are present, try restarting them.
+
+2.  **Check `.htaccess` File:**
+    - Go to File Manager in cPanel.
+    - Navigate to the `public_html` folder (or wherever your main site is).
+    - Ensure "Show Hidden Files" is enabled in Settings (top right).
+    - Look for an `.htaccess` file. If it was recently modified (check "Last Modified" date), it might have lost the rules for your Python apps.
+    - Compare it with a backup if available. Note that cPanel usually manages the Python app routing automatically, but sometimes manual intervention is needed if it breaks.
+
+3.  **Re-save Python App Configuration:**
+    - In "Setup Python App", edit an application.
+    - Make a trivial change (e.g., add a space to a description if possible, or just click "Save" or "Update" if available).
+    - Sometimes simply clicking "Restart" forces cPanel to regenerate the necessary configuration files.
+
+4.  **Contact Hosting Support:**
+    - If all else fails, contact VentraIP support. Mention that "All Python (Phusion Passenger) apps on my account are returning 404 errors." They can check the server logs.
